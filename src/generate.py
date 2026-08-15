@@ -42,7 +42,7 @@ async def generate_for_item(item, domain):
         
     return item
 
-async def process_domain(domain, is_pilot=True):
+async def process_domain(domain, is_pilot=True, overwrite=False):
     print(f"Starting generation for domain: {domain}")
     suffix = "_pilot.jsonl" if is_pilot else ".jsonl"
     in_path = os.path.join(RAW_DATA_DIR, f"{domain}{suffix}")
@@ -59,15 +59,20 @@ async def process_domain(domain, is_pilot=True):
             
     processed_ids = set()
     if os.path.exists(out_path):
-        with open(out_path, "r", encoding="utf-8") as f:
-            for line in f:
-                try:
-                    processed_ids.add(json.loads(line)["item_id"])
-                except Exception:
-                    pass
+        if overwrite:
+            os.remove(out_path)
+            print(f"Deleted {out_path} and starting fresh.")
+        else:
+            with open(out_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    try:
+                        processed_ids.add(json.loads(line)["item_id"])
+                    except Exception:
+                        pass
                     
     items_to_process = [item for item in items if item["item_id"] not in processed_ids]
-    print(f"Found {len(processed_ids)} already processed items. {len(items_to_process)} left to process.")
+    if processed_ids:
+        print(f"Found {len(processed_ids)} already processed items. {len(items_to_process)} left to process.")
     
     if not items_to_process:
         print(f"Finished {domain}. All items already generated.")
@@ -89,10 +94,21 @@ async def process_domain(domain, is_pilot=True):
             
     print(f"Finished {domain}. Saved to {out_path}")
 
-async def main():
-    domains = ["math", "code", "science"]
+async def main(is_pilot=True, domains=None, overwrite=False):
+    if domains is None:
+        domains = ["math", "code", "science"]
     for domain in domains:
-        await process_domain(domain, is_pilot=True)
+        await process_domain(domain, is_pilot=is_pilot, overwrite=overwrite)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--mode", type=str, choices=["pilot", "actual"], default="pilot")
+    parser.add_argument("--domain", type=str, choices=["all", "math", "code", "science"], default="all")
+    parser.add_argument("--overwrite", action="store_true", help="Delete existing output and start fresh")
+    args = parser.parse_args()
+
+    is_pilot = args.mode == "pilot"
+    domains = ["math", "code", "science"] if args.domain == "all" else [args.domain]
+    
+    asyncio.run(main(is_pilot=is_pilot, domains=domains, overwrite=args.overwrite))

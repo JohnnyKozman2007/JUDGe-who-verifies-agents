@@ -9,13 +9,13 @@ load_dotenv()
 RAW_DATA_DIR = os.path.join("data", "raw")
 os.makedirs(RAW_DATA_DIR, exist_ok=True)
 
-def load_math():
+def load_math(mode):
     print("Loading MATH dataset...")
     # MATH dataset 'dim/competition_math' only has a train split.
     ds = load_dataset('dim/competition_math', split='train')
     
-    # Take a random sample of 120 with fixed seed
-    sampled = ds.shuffle(seed=42).select(range(120))
+    num_samples = 10 if mode == "pilot" else 150
+    sampled = ds.shuffle(seed=42).select(range(num_samples))
     
     # Convert to standard format
     standardized = []
@@ -28,13 +28,13 @@ def load_math():
         })
     return standardized
 
-def load_code():
+def load_code(mode):
     print("Loading HumanEval+ dataset...")
     # HumanEval+ 
     ds = load_dataset('evalplus/humanevalplus', split='test')
     
-    # We only have 164 total. Sample 120.
-    sampled = ds.shuffle(seed=42).select(range(120))
+    num_samples = 10 if mode == "pilot" else 150
+    sampled = ds.shuffle(seed=42).select(range(num_samples))
     
     standardized = []
     for i, item in enumerate(sampled):
@@ -48,14 +48,14 @@ def load_code():
         })
     return standardized
 
-def load_science():
+def load_science(mode):
     print("Loading GPQA-Diamond dataset...")
     # GPQA Diamond requires HF Token
     token = os.environ.get("HF_TOKEN")
     ds = load_dataset('Idavidrein/gpqa', 'gpqa_diamond', split='train', token=token)
     
-    # GPQA Diamond has around 198 questions. Sample 120.
-    sampled = ds.shuffle(seed=42).select(range(120))
+    num_samples = 10 if mode == "pilot" else 150
+    sampled = ds.shuffle(seed=42).select(range(num_samples))
     
     standardized = []
     for i, item in enumerate(sampled):
@@ -90,29 +90,47 @@ def load_science():
         })
     return standardized
 
-def save_data(data, domain):
-    # Full 120
-    out_path = os.path.join(RAW_DATA_DIR, f"{domain}.jsonl")
-    with open(out_path, "w", encoding="utf-8") as f:
-        for item in data:
-            f.write(json.dumps(item) + "\n")
-    print(f"Saved {len(data)} items to {out_path}")
+def save_data(data, domain, mode):
+    suffix = "_pilot.jsonl" if mode == "pilot" else ".jsonl"
+    out_path = os.path.join(RAW_DATA_DIR, f"{domain}{suffix}")
     
-    # Pilot 10
-    pilot_path = os.path.join(RAW_DATA_DIR, f"{domain}_pilot.jsonl")
-    with open(pilot_path, "w", encoding="utf-8") as f:
-        for item in data[:10]:
+    # Check existing items for resume support
+    existing_ids = set()
+    if os.path.exists(out_path):
+        with open(out_path, "r", encoding="utf-8") as f:
+            for line in f:
+                try:
+                    existing_ids.add(json.loads(line)["item_id"])
+                except Exception:
+                    pass
+    
+    new_items = [item for item in data if item["item_id"] not in existing_ids]
+    
+    if not new_items:
+        print(f"Already have {len(existing_ids)} items for {domain} in {out_path}. Nothing to add.")
+        return
+    
+    with open(out_path, "a", encoding="utf-8") as f:
+        for item in new_items:
             f.write(json.dumps(item) + "\n")
-    print(f"Saved 10 pilot items to {pilot_path}")
+    print(f"Added {len(new_items)} new items to {out_path} (total: {len(existing_ids) + len(new_items)})")
 
 if __name__ == "__main__":
-    math_data = load_math()
-    save_data(math_data, "math")
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--mode", type=str, choices=["pilot", "actual"], default="pilot")
+    parser.add_argument("--domain", type=str, choices=["all", "math", "code", "science"], default="all")
+    args = parser.parse_args()
+
+    domains = ["math", "code", "science"] if args.domain == "all" else [args.domain]
     
-    code_data = load_code()
-    save_data(code_data, "code")
-    
-    science_data = load_science()
-    save_data(science_data, "science")
+    for domain in domains:
+        if domain == "math":
+            data = load_math(args.mode)
+        elif domain == "code":
+            data = load_code(args.mode)
+        elif domain == "science":
+            data = load_science(args.mode)
+        save_data(data, domain, args.mode)
     
     print("Data loading complete.")

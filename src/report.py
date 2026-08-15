@@ -2,12 +2,11 @@ import os
 import json
 import re
 import argparse
-import subprocess
-import tempfile
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy.stats import chi2_contingency
+from execution_grounding import run_candidate_code
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -16,7 +15,8 @@ def parse_args():
     parser.add_argument("--ver_dir", default="data/verified", help="Directory with verified jsonl files")
     parser.add_argument("--out_dir", default="reports", help="Output directory for CSV reports")
     parser.add_argument("--plot_dir", default="plots", help="Output directory for plots")
-    parser.add_argument("--is_pilot", action="store_true", help="Use pilot files")
+    parser.add_argument("--mode", type=str, choices=["pilot", "actual"], default="pilot", help="Run in pilot or actual mode")
+    parser.add_argument("--is_pilot", action="store_true", help="Legacy flag: use pilot mode")
     return parser.parse_args()
 
 def grade_science(candidate_text, ground_truth):
@@ -29,37 +29,50 @@ def grade_science(candidate_text, ground_truth):
         return matches[-1] == ground_truth.upper()
     return False
 
+def _math_values_equal(a, b, tol=1e-6):
+    """Compare two math answer strings, numerically if possible, else exact (stripped) string match."""
+    a, b = a.strip(), b.strip()
+    try:
+        return abs(float(a.replace(',', '')) - float(b.replace(',', ''))) < tol
+    except ValueError:
+        return a == b
+
 def grade_math(candidate_text, ground_truth):
     if not candidate_text: return False
     gt_match = re.search(r'\\boxed\{(.*?)\}', ground_truth)
-    if not gt_match:
-        gt_val = ground_truth.strip()
-    else:
-        gt_val = gt_match.group(1).strip()
-    return gt_val in candidate_text
+    gt_val = gt_match.group(1).strip() if gt_match else ground_truth.strip()
 
-def grade_code(candidate_text, test_code):
-    if not candidate_text: return False
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
-        f.write(candidate_text + "\n\n" + test_code)
-        tmp_name = f.name
+    # Prefer the candidate's own boxed answer if present (most reliable signal)
+    cand_box = re.search(r'\\boxed\{(.*?)\}', candidate_text)
+    if cand_box:
+        return _math_values_equal(cand_box.group(1), gt_val)
+
+    # Try numeric comparison using standalone numbers only (word/number-boundary aware,
+    # so ground truth "5" does NOT match inside "15", "-5", "1.5", "25", etc.)
     try:
-        result = subprocess.run(
-            ["python", tmp_name],
-            capture_output=True,
-            timeout=2,
-            text=True
-        )
-        is_correct = (result.returncode == 0)
-    except subprocess.TimeoutExpired:
-        is_correct = False
-    finally:
-        if os.path.exists(tmp_name):
-            os.remove(tmp_name)
-    return is_correct
+        gt_num = float(gt_val.replace(',', ''))
+        for tok in re.findall(r'(?<![\d.])-?\d+\.?\d*(?![\d.])', candidate_text):
+            try:
+                if abs(float(tok) - gt_num) < 1e-6:
+                    return True
+            except ValueError:
+                continue
+        return False
+    except ValueError:
+        # Non-numeric ground truth (e.g. "3/4", "x=5") - use word-boundary match,
+        # not raw substring, to avoid partial-token false positives
+        pattern = re.escape(gt_val)
+        return re.search(rf'(?<!\w){pattern}(?!\w)', candidate_text) is not None
+
+def grade_code(candidate_text, test_code, entry_point=None):
+    """Reuses run_candidate_code from execution_grounding.py — single source of truth."""
+    if not candidate_text: return False
+    result = run_candidate_code(candidate_text, test_code, entry_point=entry_point)
+    return result.ran_successfully
 
 def load_and_grade(args):
-    suffix = "_pilot.jsonl" if args.is_pilot else ".jsonl"
+    mode = "pilot" if args.is_pilot else args.mode
+    suffix = "_pilot.jsonl" if mode == "pilot" else ".jsonl"
     domains = ["math", "code", "science"]
     graded_candidates = {}
     
@@ -89,12 +102,13 @@ def load_and_grade(args):
                     elif domain == "math":
                         is_correct = grade_math(cand_text, raw_item['ground_truth'])
                     elif domain == "code":
-                        is_correct = grade_code(cand_text, raw_item['test'])
+                        is_correct = grade_code(cand_text, raw_item['test'], entry_point=raw_item.get('entry_point'))
                     graded_candidates[(domain, item_id, gen_model)] = is_correct
     return graded_candidates
 
 def analyze_verifications(args, graded_candidates):
-    suffix = "_pilot.jsonl" if args.is_pilot else ".jsonl"
+    mode = "pilot" if args.is_pilot else args.mode
+    suffix = "_pilot.jsonl" if mode == "pilot" else ".jsonl"
     domains = ["math", "code", "science"]
     rows = []
     
@@ -132,21 +146,30 @@ def analyze_verifications(args, graded_candidates):
                             reasoning_was_right = True
                 
                 if parsed is None:
-                    verdict = not cand_is_correct
+                    # Unparseable verdict: exclude from confusion matrix entirely rather
+                    # than silently forcing it to count as "wrong" (which fabricates signal
+                    # and biases accuracy/FPR/FNR downward without disclosure).
+                    tp = fp = tn = fn = False
                 else:
                     verdict = parsed
-                    
-                tp = (cand_is_correct == True and verdict == True)
-                fp = (cand_is_correct == False and verdict == True)
-                tn = (cand_is_correct == False and verdict == False)
-                fn = (cand_is_correct == True and verdict == False)
+                    tp = (cand_is_correct == True and verdict == True)
+                    fp = (cand_is_correct == False and verdict == True)
+                    tn = (cand_is_correct == False and verdict == False)
+                    fn = (cand_is_correct == True and verdict == False)
                 
+                # Ground-truth authorship, independent of what the verifier was TOLD (frame).
+                actual_source = 'self' if gen_model == ver_model else 'other'
+                # Was the told frame accurate? (only meaningful when frame in {self, other})
+                frame_matches_truth = (frame == actual_source) if frame in ('self', 'other') else None
+
                 rows.append({
                     'domain': domain,
                     'item_id': item_id,
                     'generator': gen_model,
                     'verifier': ver_model,
                     'frame': frame,
+                    'actual_source': actual_source,
+                    'frame_matches_truth': frame_matches_truth,
                     'strategy': strategy,
                     'candidate_is_correct': cand_is_correct,
                     'parsed_verdict': parsed,
@@ -159,7 +182,8 @@ def analyze_verifications(args, graded_candidates):
                     'verbosity': verbosity,
                     'dissociated': int(dissociated),
                     'label_was_right': int(label_was_right),
-                    'reasoning_was_right': int(reasoning_was_right)
+                    'reasoning_was_right': int(reasoning_was_right),
+                    'overrode_passing_tests': int(v.get('overrode_passing_tests', False))
                 })
     return pd.DataFrame(rows)
 
@@ -222,21 +246,34 @@ def write_behavior_breakdown(f, title, df, group_col=None):
             f.write(f"- **{g}** -> Caught: {caught*100:.1f}% | Passed: {passed*100:.1f}% | Introduced: {intro*100:.1f}% | Confirmed: {conf*100:.1f}%\n")
 
 def generate_reports_and_plots(df, args):
+    # Determine prefix based on mode (pilot/actual). Legacy is_pilot flag overrides if set.
+    mode = "pilot" if args.is_pilot else args.mode
+    prefix = "pilot_" if mode == "pilot" else ""
+    
+    csv_path = os.path.join(args.out_dir, f'{prefix}results_granular.csv')
+    # If CSV already exists or plot directory has files, ask once
+    need_prompt = os.path.exists(csv_path) or (os.path.isdir(args.plot_dir) and any(os.scandir(args.plot_dir)))
+    if need_prompt:
+        ans = input(f"Report output (CSV and/or plots) already exists. Overwrite all? (y/n): ")
+        if ans.lower().strip() != 'y':
+            print("Skipping report generation.")
+            return
     os.makedirs(args.out_dir, exist_ok=True)
     os.makedirs(args.plot_dir, exist_ok=True)
-    prefix = "pilot_" if args.is_pilot else ""
     
-    df.to_csv(os.path.join(args.out_dir, f'{prefix}results_granular.csv'), index=False)
+    df.to_csv(csv_path, index=False)
     
     agg = df.groupby(['domain', 'verifier', 'frame', 'strategy']).agg(
         Total=('item_id', 'count'),
         TP=('tp', 'sum'), FP=('fp', 'sum'), TN=('tn', 'sum'), FN=('fn', 'sum'),
         Avg_Latency=('latency', 'mean'), Avg_Verbosity=('verbosity', 'mean'),
         Dissociated=('dissociated', 'sum'),
-        Formatting_Fails=('formatting_fail', 'sum')
+        Formatting_Fails=('formatting_fail', 'sum'),
+        Overrode_Passing_Tests=('overrode_passing_tests', 'sum')
     ).reset_index()
     
-    agg['Accuracy'] = (agg['TP'] + agg['TN']) / agg['Total']
+    agg['Valid_Total'] = (agg['Total'] - agg['Formatting_Fails']).clip(lower=1)
+    agg['Accuracy'] = (agg['TP'] + agg['TN']) / agg['Valid_Total']
     agg['FPR'] = agg['FP'] / (agg['FP'] + agg['TN']).replace(0, 1)
     agg['FNR'] = agg['FN'] / (agg['FN'] + agg['TP']).replace(0, 1)
     agg['Dissociation_Rate'] = agg['Dissociated'] / agg['Total']
@@ -261,20 +298,39 @@ def generate_reports_and_plots(df, args):
     bias_merged = pd.merge(pivot_fpr, pivot_fnr, on=['domain', 'verifier', 'strategy'], suffixes=('_FPR', '_FNR'))
     bias_merged.to_csv(os.path.join(args.out_dir, f'{prefix}bias_metrics.csv'), index=False)
     
-    p_values = {}
-    overall_bias = df[df['frame'].isin(['self', 'other'])].groupby(['verifier', 'frame']).agg(
+    # P-values computed PER (verifier, domain, strategy) cell so they actually test the same
+    # slice of data as the bias number they're reported next to (previously this was collapsed
+    # across all domains/strategies, which tested a different, blended dataset than the rows
+    # it appeared under). Expect many "not significant" results at pilot N (~20/cell) - that's
+    # honest, not a flaw; it'll sharpen once cell sizes grow in the full run.
+    cell_p_values = {}
+    overall_bias = df[df['frame'].isin(['self', 'other'])].groupby(['verifier', 'domain', 'strategy', 'frame']).agg(
         TP=('tp', 'sum'), FP=('fp', 'sum'), TN=('tn', 'sum'), FN=('fn', 'sum')
     ).reset_index()
-    for verifier in overall_bias['verifier'].unique():
-        v_df = overall_bias[overall_bias['verifier'] == verifier]
-        if 'self' in v_df['frame'].values and 'other' in v_df['frame'].values:
-            self_row = v_df[v_df['frame'] == 'self'].iloc[0]
-            other_row = v_df[v_df['frame'] == 'other'].iloc[0]
+    for (verifier, domain, strategy), cell_df in overall_bias.groupby(['verifier', 'domain', 'strategy']):
+        if 'self' in cell_df['frame'].values and 'other' in cell_df['frame'].values:
+            self_row = cell_df[cell_df['frame'] == 'self'].iloc[0]
+            other_row = cell_df[cell_df['frame'] == 'other'].iloc[0]
             try: _, p_fpr, _, _ = chi2_contingency([[self_row['FP'], self_row['TN']], [other_row['FP'], other_row['TN']]])
             except: p_fpr = 1.0
             try: _, p_fnr, _, _ = chi2_contingency([[self_row['FN'], self_row['TP']], [other_row['FN'], other_row['TP']]])
             except: p_fnr = 1.0
-            p_values[verifier] = {'fpr_p': p_fpr, 'fnr_p': p_fnr}
+            cell_p_values[(verifier, domain, strategy)] = {'fpr_p': p_fpr, 'fnr_p': p_fnr}
+
+    # --- Belief-vs-Reality analysis (answers Primary Question #1) ---
+    # Crosses the TOLD frame against the ACTUAL (ground-truth) source, so we can separate
+    # "does being told you wrote it change behavior" from "does actually having written it
+    # change behavior" - these were previously conflated because ~75% of "self"-labeled rows
+    # were not actually self-authored, and the report never surfaced the actual_source field.
+    belief_reality = df[df['frame'].isin(['self', 'other'])].groupby(
+        ['verifier', 'frame', 'actual_source']
+    ).agg(
+        Total=('item_id', 'count'), TP=('tp', 'sum'), FP=('fp', 'sum'), TN=('tn', 'sum'), FN=('fn', 'sum'),
+        Valid=('formatting_fail', lambda s: (1 - s).sum())
+    ).reset_index()
+    belief_reality['Accuracy'] = (belief_reality['TP'] + belief_reality['TN']) / belief_reality['Valid'].clip(lower=1)
+    belief_reality['FPR'] = belief_reality['FP'] / (belief_reality['FP'] + belief_reality['TN']).replace(0, 1)
+    belief_reality.to_csv(os.path.join(args.out_dir, f'{prefix}belief_vs_reality.csv'), index=False)
 
     sns.set_theme(style="whitegrid")
     
@@ -382,9 +438,40 @@ def generate_reports_and_plots(df, args):
                 f.write(f"- **{row['verifier']}** ({row['domain']}, {row['strategy']}): **+{row['FNR_Self_Bias']*100:.1f}%** bias\n")
                 
         f.write("\n### Statistical Significance (P-Values for Bias)\n")
-        f.write("*Chi-Square tests on raw False Positives and False Negatives between Self and Other frames. (p < 0.05 is statistically significant).*\n")
-        for verifier, pvals in p_values.items():
-            f.write(f"- **{verifier}**: FPR Bias p={pvals['fpr_p']:.4f} | FNR Bias p={pvals['fnr_p']:.4f}\n")
+        f.write("*Chi-Square tests on raw False Positives/Negatives between Self and Other frames, computed PER (verifier, domain, strategy) cell "
+                "- i.e. each p-value tests the exact same slice of data as the bias row above it. Small pilot sample sizes (~20/cell) mean most "
+                "will read as not significant; that's expected at this scale, not a null result.*\n")
+        for _, row in top_fpr.iterrows() if 'FPR_Self_Bias' in bias_merged.columns else []:
+            key = (row['verifier'], row['domain'], row['strategy'])
+            pv = cell_p_values.get(key)
+            if pv:
+                f.write(f"- **{row['verifier']}** ({row['domain']}, {row['strategy']}): FPR Bias p={pv['fpr_p']:.4f} | FNR Bias p={pv['fnr_p']:.4f}\n")
+
+        f.write("\n## 7. Test Suite Overrides (Code Domain)\n")
+        f.write("*Instances where the code passed the test suite (ground truth correct), but the verifier LLM overrode that signal and marked it INCORRECT.*\n")
+        code_agg = agg[agg['domain'] == 'code']
+        if not code_agg.empty:
+            override_sum = code_agg['Overrode_Passing_Tests'].sum()
+            f.write(f"- **Total Overrides**: {override_sum} out of {code_agg['TP'].sum() + code_agg['FN'].sum()} passing submissions.\n\n")
+            f.write("### By Verifier Model\n")
+            for verifier in sorted(code_agg['verifier'].unique()):
+                v_df = code_agg[code_agg['verifier'] == verifier]
+                f.write(f"- **{verifier}**: {v_df['Overrode_Passing_Tests'].sum()}\n")
+        else:
+            f.write("*(No code domain data present)*\n")
+
+        f.write("\n## 8. Belief vs. Reality (Told Frame vs. Actual Authorship)\n")
+        f.write("*Answers Primary Question 1: does TELLING a verifier 'you wrote this' change its accuracy, independent of whether that's true? "
+                "Rows below cross the told frame against ground-truth authorship (actual_source).*\n\n")
+        f.write("| Verifier | Told Frame | Actually Self-Authored? | Accuracy | FPR |\n")
+        f.write("|---|---|---|---|---|\n")
+        for _, row in belief_reality.sort_values(['verifier', 'frame', 'actual_source']).iterrows():
+            actually = "Yes" if row['actual_source'] == 'self' else "No"
+            f.write(f"| {row['verifier']} | {row['frame']} | {actually} | {row['Accuracy']*100:.1f}% | {row['FPR']*100:.1f}% |\n")
+        f.write("\nRead this as 2x2 per verifier: (told self / actually self) vs (told self / actually other) vs "
+                "(told other / actually self) vs (told other / actually other). A gap between the first two rows "
+                "(same actual authorship, different label) isolates the pure *belief* effect. A gap between rows 1 and 3 "
+                "(same label, different truth) isolates the pure *reality* effect. Full data: `belief_vs_reality.csv`.\n")
 
         f.write("\n## 7. Confusion Matrices (Visuals & Raw Data)\n")
         for verifier in sorted(df['verifier'].unique()):
@@ -401,6 +488,9 @@ def generate_reports_and_plots(df, args):
 
 def main():
     args = parse_args()
+    # Resolve mode: legacy --is_pilot overrides --mode if present
+    if getattr(args, "is_pilot", False):
+        args.mode = "pilot"
     print("Grading generated candidates against ground truth...")
     graded = load_and_grade(args)
     print("Analyzing verifications...")
