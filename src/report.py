@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy.stats import chi2_contingency
 from execution_grounding import run_candidate_code
+from science_utils import extract_option_map_from_question, parse_science_candidate_answer
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -19,15 +20,12 @@ def parse_args():
     parser.add_argument("--is_pilot", action="store_true", help="Legacy flag: use pilot mode")
     return parser.parse_args()
 
-def grade_science(candidate_text, ground_truth):
-    if not candidate_text: return False
-    match = re.search(r'(?i)(?:answer|option)\s*(?:is)?\s*[\:\*\_]*\s*\(?([A-D])\)?', candidate_text)
-    if match:
-        return match.group(1).upper() == ground_truth.upper()
-    matches = re.findall(r'\b([A-D])\b', candidate_text.upper())
-    if matches:
-        return matches[-1] == ground_truth.upper()
-    return False
+def grade_science(candidate_text, raw_item):
+    if not candidate_text:
+        return False
+    option_map = raw_item.get("option_map") or extract_option_map_from_question(raw_item["question"])
+    parsed = parse_science_candidate_answer(candidate_text, option_map)
+    return parsed.get("letter") == raw_item["ground_truth"]
 
 def _math_values_equal(a, b, tol=1e-6):
     """Compare two math answer strings, numerically if possible, else exact (stripped) string match."""
@@ -75,6 +73,7 @@ def load_and_grade(args):
     suffix = "_pilot.jsonl" if mode == "pilot" else ".jsonl"
     domains = ["math", "code", "science"]
     graded_candidates = {}
+    science_audit_rows = []
     
     for domain in domains:
         raw_path = os.path.join(args.raw_dir, f"{domain}{suffix}")
@@ -98,13 +97,26 @@ def load_and_grade(args):
                 
                 for gen_model, cand_text in item.get('candidates', {}).items():
                     if domain == "science":
-                        is_correct = grade_science(cand_text, raw_item['ground_truth'])
+                        option_map = raw_item.get("option_map") or extract_option_map_from_question(raw_item["question"])
+                        parsed = parse_science_candidate_answer(cand_text, option_map)
+                        is_correct = parsed.get("letter") == raw_item["ground_truth"]
+                        science_audit_rows.append({
+                            "item_id": item_id,
+                            "generator": gen_model,
+                            "ground_truth_letter": raw_item["ground_truth"],
+                            "ground_truth_text": raw_item.get("correct_answer_text"),
+                            "extracted_letter": parsed.get("letter"),
+                            "extracted_option_text": parsed.get("option_text"),
+                            "extraction_mode": parsed.get("mode"),
+                            "parsed_successfully": int(parsed.get("letter") is not None),
+                            "is_correct": int(is_correct),
+                        })
                     elif domain == "math":
                         is_correct = grade_math(cand_text, raw_item['ground_truth'])
                     elif domain == "code":
                         is_correct = grade_code(cand_text, raw_item['test'], entry_point=raw_item.get('entry_point'))
                     graded_candidates[(domain, item_id, gen_model)] = is_correct
-    return graded_candidates
+    return graded_candidates, pd.DataFrame(science_audit_rows)
 
 def analyze_verifications(args, graded_candidates):
     mode = "pilot" if args.is_pilot else args.mode
@@ -245,7 +257,7 @@ def write_behavior_breakdown(f, title, df, group_col=None):
             conf = agg_b['tp'] / max(1, agg_b['fn'] + agg_b['tp'])
             f.write(f"- **{g}** -> Caught: {caught*100:.1f}% | Passed: {passed*100:.1f}% | Introduced: {intro*100:.1f}% | Confirmed: {conf*100:.1f}%\n")
 
-def generate_reports_and_plots(df, args):
+def generate_reports_and_plots(df, args, science_audit_df=None):
     # Determine prefix based on mode (pilot/actual). Legacy is_pilot flag overrides if set.
     mode = "pilot" if args.is_pilot else args.mode
     prefix = "pilot_" if mode == "pilot" else ""
@@ -262,6 +274,8 @@ def generate_reports_and_plots(df, args):
     os.makedirs(args.plot_dir, exist_ok=True)
     
     df.to_csv(csv_path, index=False)
+    if science_audit_df is not None and not science_audit_df.empty:
+        science_audit_df.to_csv(os.path.join(args.out_dir, f'{prefix}science_generation_audit.csv'), index=False)
     
     agg = df.groupby(['domain', 'verifier', 'frame', 'strategy']).agg(
         Total=('item_id', 'count'),
@@ -492,12 +506,12 @@ def main():
     if getattr(args, "is_pilot", False):
         args.mode = "pilot"
     print("Grading generated candidates against ground truth...")
-    graded = load_and_grade(args)
+    graded, science_audit_df = load_and_grade(args)
     print("Analyzing verifications...")
     df = analyze_verifications(args, graded)
     if not df.empty:
         print("Generating reports and plots...")
-        generate_reports_and_plots(df, args)
+        generate_reports_and_plots(df, args, science_audit_df=science_audit_df)
     else:
         print("No verified data found to report on.")
 

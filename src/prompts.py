@@ -1,10 +1,16 @@
+from science_utils import SCIENCE_FINAL_ANSWER_FORMAT
+
 def get_generation_prompt(domain: str, question: str) -> str:
     if domain == "math":
         return f"Solve the following math problem. Provide a clear step-by-step solution, and state the final answer clearly.\n\nProblem:\n{question}"
     elif domain == "code":
         return f"Write a Python function to solve the following task. Provide only the valid Python code, without any markdown formatting or explanations.\n\nTask:\n{question}"
     elif domain == "science":
-        return f"Answer the following multiple-choice science question. Provide a step-by-step reasoning and then state the correct option (A, B, C, or D).\n\nQuestion:\n{question}"
+        return (
+            "Answer the following multiple-choice science question. Provide concise step-by-step reasoning and "
+            f"end on its own line with exactly: {SCIENCE_FINAL_ANSWER_FORMAT}. Choose exactly one of the provided options.\n\n"
+            f"Question:\n{question}"
+        )
     else:
         raise ValueError(f"Unknown domain: {domain}")
 
@@ -43,8 +49,7 @@ def get_verification_prompt(domain: str, question: str, candidate_answer: str, f
         elif domain == "code":
             prompt += "Use the following rubric:\n1. Does the code handle edge cases?\n2. Is the logic correct?\n3. Does the code strictly adhere to the prompt's constraints?\n"
         elif domain == "science":
-            prompt += "Use the following rubric:\n1. Is the reasoning factually accurate based on scientific knowledge?\n2. Does it correctly evaluate the given options and select the right one?\n"
-            
+            prompt += "Use the following rubric:\n1. Is the reasoning factually accurate based on scientific knowledge?\n2. Does it correctly evaluate the given options and select the right one?\n3. Does the candidate's stated final option match the reasoning it gives?\n"
         prompt += "CRITICAL INSTRUCTIONS:\n"
         prompt += "1. DO NOT re-solve the problem from scratch. ONLY evaluate the candidate's existing logic.\n"
         prompt += "2. Keep your evaluation extremely brief (maximum 2-3 sentences).\n"

@@ -3,6 +3,7 @@ import json
 from datasets import load_dataset
 import pandas as pd
 from dotenv import load_dotenv
+from science_utils import build_option_map, render_science_question, validate_science_options
 
 load_dotenv()
 
@@ -55,18 +56,16 @@ def load_science(mode):
     ds = load_dataset('Idavidrein/gpqa', 'gpqa_diamond', split='train', token=token)
     
     num_samples = 10 if mode == "pilot" else 150
-    sampled = ds.shuffle(seed=42).select(range(num_samples))
+    sampled = ds.shuffle(seed=42)
     
     standardized = []
-    for i, item in enumerate(sampled):
-        # Format the question as multiple choice
-        question_text = item["Question"] + "\nOptions:\n"
-        
-        # We need to present the options randomly, but GPQA already has Incorrect Answer 1, etc.
-        # So let's just present them and the correct answer. 
-        # For simplicity, we just provide the question and ask for the correct answer, or present options.
+    skipped = []
+    for item in sampled:
+        if len(standardized) >= num_samples:
+            break
+
         import random
-        random.seed(42 + i)
+        random.seed(42 + len(standardized))
         
         options = [
             item["Correct Answer"],
@@ -75,19 +74,36 @@ def load_science(mode):
             item["Incorrect Answer 3"]
         ]
         random.shuffle(options)
-        
-        for j, opt in enumerate(options):
-            question_text += f"{chr(65+j)}. {opt}\n"
-            
+
+        issues = validate_science_options(options)
+        if issues:
+            skipped.append({"question": item["Question"][:80], "issues": issues})
+            continue
+
+        question_text = render_science_question(item["Question"], options)
         correct_letter = chr(65 + options.index(item["Correct Answer"]))
+        option_map = build_option_map(options)
         
         standardized.append({
-            "item_id": f"science_{i}",
+            "item_id": f"science_{len(standardized)}",
             "domain": "science",
+            "question_stem": item["Question"],
             "question": question_text,
             "ground_truth": correct_letter,
-            "correct_answer_text": item["Correct Answer"]
+            "correct_answer_text": item["Correct Answer"],
+            "option_map": option_map,
+            "options": [option_map[chr(65 + idx)] for idx in range(4)],
+            "source_dataset": "Idavidrein/gpqa:gpqa_diamond",
         })
+
+    if len(standardized) < num_samples:
+        raise RuntimeError(
+            f"Could only prepare {len(standardized)} valid science items out of requested {num_samples}. "
+            f"Skipped {len(skipped)} malformed items."
+        )
+
+    if skipped:
+        print(f"Skipped {len(skipped)} malformed GPQA items while building the science split.")
     return standardized
 
 def save_data(data, domain, mode):
