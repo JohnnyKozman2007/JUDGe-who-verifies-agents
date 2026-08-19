@@ -16,7 +16,6 @@ def parse_args():
     parser.add_argument("--out_dir", default="reports", help="Output directory for CSV reports")
     parser.add_argument("--plot_dir", default="plots", help="Output directory for plots")
     parser.add_argument("--mode", type=str, choices=["pilot", "actual"], default="pilot", help="Run in pilot or actual mode")
-    parser.add_argument("--is_pilot", action="store_true", help="Legacy flag: use pilot mode")
     return parser.parse_args()
 
 def grade_science(candidate_text, ground_truth):
@@ -71,7 +70,7 @@ def grade_code(candidate_text, test_code, entry_point=None):
     return result.ran_successfully
 
 def load_and_grade(args):
-    mode = "pilot" if args.is_pilot else args.mode
+    mode = args.mode
     suffix = "_pilot.jsonl" if mode == "pilot" else ".jsonl"
     domains = ["math", "code", "science"]
     graded_candidates = {}
@@ -106,11 +105,25 @@ def load_and_grade(args):
                     graded_candidates[(domain, item_id, gen_model)] = is_correct
     return graded_candidates
 
-def analyze_verifications(args, graded_candidates):
-    mode = "pilot" if args.is_pilot else args.mode
+def load_fuzz_results(args):
+    mode = args.mode
+    suffix = "_pilot.jsonl" if mode == "pilot" else ".jsonl"
+    fuzz_dict = {}
+    path = os.path.join("data", "validated", f"code_overrides{suffix}")
+    if os.path.exists(path):
+        with open(path, 'r', encoding='utf-8') as f:
+            for line in f:
+                item = json.loads(line)
+                key = (item['item_id'], item['generator_model'], item['verifier_model'], item['frame'], item['strategy'])
+                fuzz_dict[key] = item.get('fuzz_verdict')
+    return fuzz_dict
+
+def analyze_verifications(args, graded_candidates, fuzz_dict):
+    mode = args.mode
     suffix = "_pilot.jsonl" if mode == "pilot" else ".jsonl"
     domains = ["math", "code", "science"]
     rows = []
+    fuzz_errors_removed = 0
     
     for domain in domains:
         ver_path = os.path.join(args.ver_dir, f"{domain}{suffix}")
@@ -126,6 +139,22 @@ def analyze_verifications(args, graded_candidates):
                 strategy = v['strategy']
                 
                 cand_is_correct = graded_candidates.get((domain, item_id, gen_model), False)
+                adjusted_cand_is_correct = cand_is_correct
+                
+                fuzz_verdict = None
+                if domain == "code":
+                    key = (item_id, gen_model, ver_model, frame, strategy)
+                    fuzz_verdict = fuzz_dict.get(key)
+                
+                if fuzz_verdict == "ERROR":
+                    fuzz_errors_removed += 1
+                    continue
+                    
+                if fuzz_verdict == "BUG_CONFIRMED":
+                    adjusted_cand_is_correct = False
+                elif fuzz_verdict in ("REFERENCE_BUG", "NO_DISCREPANCY"):
+                    adjusted_cand_is_correct = True
+
                 parsed = v.get('parsed_verdict')
                 thinking = v.get('thinking_or_evaluation', '')
                 verbosity = len(thinking) if thinking else 0
@@ -135,10 +164,11 @@ def analyze_verifications(args, graded_candidates):
                 reasoning_was_right = False
                 
                 if strategy != 'direct' and thinking and parsed is not None:
-                    thinking_lower = thinking.lower()
-                    negative_keywords = ['error', 'fail', 'incorrect', 'issue', 'bug', 'wrong']
-                    has_negative = any(kw in thinking_lower for kw in negative_keywords)
-                    if parsed == True and has_negative:
+                    # Use word-boundary regex to avoid substring false alarms, and negative lookbehinds for "no/not"
+                    has_negative = bool(re.search(r'(?<!no )(?<!not )\b(error|fail|fails|incorrect|issue|bug|wrong)\b', thinking, re.IGNORECASE))
+                    has_positive = bool(re.search(r'(?<!no )(?<!not )\b(correct|valid|sound|perfect)\b', thinking, re.IGNORECASE))
+                    
+                    if (parsed is True and has_negative) or (parsed is False and has_positive and not has_negative):
                         dissociated = True
                         if parsed == cand_is_correct:
                             label_was_right = True
@@ -146,16 +176,20 @@ def analyze_verifications(args, graded_candidates):
                             reasoning_was_right = True
                 
                 if parsed is None:
-                    # Unparseable verdict: exclude from confusion matrix entirely rather
-                    # than silently forcing it to count as "wrong" (which fabricates signal
-                    # and biases accuracy/FPR/FNR downward without disclosure).
+                    # Unparseable verdict: exclude from confusion matrix entirely
                     tp = fp = tn = fn = False
+                    adj_tp = adj_fp = adj_tn = adj_fn = False
                 else:
                     verdict = parsed
                     tp = (cand_is_correct == True and verdict == True)
                     fp = (cand_is_correct == False and verdict == True)
                     tn = (cand_is_correct == False and verdict == False)
                     fn = (cand_is_correct == True and verdict == False)
+                    
+                    adj_tp = (adjusted_cand_is_correct == True and verdict == True)
+                    adj_fp = (adjusted_cand_is_correct == False and verdict == True)
+                    adj_tn = (adjusted_cand_is_correct == False and verdict == False)
+                    adj_fn = (adjusted_cand_is_correct == True and verdict == False)
                 
                 # Ground-truth authorship, independent of what the verifier was TOLD (frame).
                 actual_source = 'self' if gen_model == ver_model else 'other'
@@ -172,12 +206,17 @@ def analyze_verifications(args, graded_candidates):
                     'frame_matches_truth': frame_matches_truth,
                     'strategy': strategy,
                     'candidate_is_correct': cand_is_correct,
+                    'adjusted_candidate_is_correct': adjusted_cand_is_correct,
                     'parsed_verdict': parsed,
                     'formatting_fail': int(parsed is None),
                     'tp': int(tp),
                     'fp': int(fp),
                     'tn': int(tn),
                     'fn': int(fn),
+                    'adj_tp': int(adj_tp),
+                    'adj_fp': int(adj_fp),
+                    'adj_tn': int(adj_tn),
+                    'adj_fn': int(adj_fn),
                     'latency': v.get('latency', 0),
                     'verbosity': verbosity,
                     'dissociated': int(dissociated),
@@ -185,7 +224,7 @@ def analyze_verifications(args, graded_candidates):
                     'reasoning_was_right': int(reasoning_was_right),
                     'overrode_passing_tests': int(v.get('overrode_passing_tests', False))
                 })
-    return pd.DataFrame(rows)
+    return pd.DataFrame(rows), fuzz_errors_removed
 
 def write_breakdown_section(f, title, df, value_col, is_percent=True, invert_good=False):
     f.write(f"\n## {title}\n")
@@ -245,9 +284,9 @@ def write_behavior_breakdown(f, title, df, group_col=None):
             conf = agg_b['tp'] / max(1, agg_b['fn'] + agg_b['tp'])
             f.write(f"- **{g}** -> Caught: {caught*100:.1f}% | Passed: {passed*100:.1f}% | Introduced: {intro*100:.1f}% | Confirmed: {conf*100:.1f}%\n")
 
-def generate_reports_and_plots(df, args):
-    # Determine prefix based on mode (pilot/actual). Legacy is_pilot flag overrides if set.
-    mode = "pilot" if args.is_pilot else args.mode
+def generate_reports_and_plots(df, args, fuzz_errors_removed):
+    # Determine prefix based on mode (pilot/actual). 
+    mode = args.mode
     prefix = "pilot_" if mode == "pilot" else ""
     
     csv_path = os.path.join(args.out_dir, f'{prefix}results_granular.csv')
@@ -266,6 +305,7 @@ def generate_reports_and_plots(df, args):
     agg = df.groupby(['domain', 'verifier', 'frame', 'strategy']).agg(
         Total=('item_id', 'count'),
         TP=('tp', 'sum'), FP=('fp', 'sum'), TN=('tn', 'sum'), FN=('fn', 'sum'),
+        Adj_TP=('adj_tp', 'sum'), Adj_FP=('adj_fp', 'sum'), Adj_TN=('adj_tn', 'sum'), Adj_FN=('adj_fn', 'sum'),
         Avg_Latency=('latency', 'mean'), Avg_Verbosity=('verbosity', 'mean'),
         Dissociated=('dissociated', 'sum'),
         Formatting_Fails=('formatting_fail', 'sum'),
@@ -274,6 +314,7 @@ def generate_reports_and_plots(df, args):
     
     agg['Valid_Total'] = (agg['Total'] - agg['Formatting_Fails']).clip(lower=1)
     agg['Accuracy'] = (agg['TP'] + agg['TN']) / agg['Valid_Total']
+    agg['Adjusted_Accuracy'] = (agg['Adj_TP'] + agg['Adj_TN']) / agg['Valid_Total']
     agg['FPR'] = agg['FP'] / (agg['FP'] + agg['TN']).replace(0, 1)
     agg['FNR'] = agg['FN'] / (agg['FN'] + agg['TP']).replace(0, 1)
     agg['Dissociation_Rate'] = agg['Dissociated'] / agg['Total']
@@ -312,9 +353,9 @@ def generate_reports_and_plots(df, args):
             self_row = cell_df[cell_df['frame'] == 'self'].iloc[0]
             other_row = cell_df[cell_df['frame'] == 'other'].iloc[0]
             try: _, p_fpr, _, _ = chi2_contingency([[self_row['FP'], self_row['TN']], [other_row['FP'], other_row['TN']]])
-            except: p_fpr = 1.0
+            except Exception: p_fpr = 1.0
             try: _, p_fnr, _, _ = chi2_contingency([[self_row['FN'], self_row['TP']], [other_row['FN'], other_row['TP']]])
-            except: p_fnr = 1.0
+            except Exception: p_fnr = 1.0
             cell_p_values[(verifier, domain, strategy)] = {'fpr_p': p_fpr, 'fnr_p': p_fnr}
 
     # --- Belief-vs-Reality analysis (answers Primary Question #1) ---
@@ -371,14 +412,18 @@ def generate_reports_and_plots(df, args):
     summary_path = os.path.join(args.out_dir, f'{prefix}executive_summary.md')
     with open(summary_path, 'w', encoding='utf-8') as f:
         f.write("# Dynamic Executive Summary\n\n")
-        f.write(f"**Total Verifications Processed:** {agg['Total'].sum()}\n\n")
+        f.write(f"**Total Verifications Processed:** {agg['Total'].sum()}\n")
+        if fuzz_errors_removed > 0:
+            f.write(f"**Fuzzer Errors Removed:** {fuzz_errors_removed} (These were safely dropped from all metrics)\n\n")
+        else:
+            f.write("\n")
         
         f.write("## Highest Accuracy by Domain\n")
         f.write(f"![Accuracy Plot](../{args.plot_dir}/{prefix}accuracy_by_domain.png)\n\n")
         for domain in sorted(df['domain'].unique()):
             dom_df = agg[agg['domain'] == domain]
             best_row = dom_df.loc[dom_df['Accuracy'].idxmax()]
-            f.write(f"- **{domain.capitalize()}**: {best_row['verifier']} (Frame: {best_row['frame']}, Strategy: {best_row['strategy']}) achieved **{best_row['Accuracy']*100:.1f}%** accuracy.\n")
+            f.write(f"- **{domain.capitalize()}**: {best_row['verifier']} (Frame: {best_row['frame']}, Strategy: {best_row['strategy']}) achieved **{best_row['Accuracy']*100:.1f}%** accuracy (**{best_row['Adjusted_Accuracy']*100:.1f}% Adjusted**).\n")
             
         f.write("\n## Model Preferences by Domain (Best Configurations)\n")
         for domain in sorted(df['domain'].unique()):
@@ -389,14 +434,22 @@ def generate_reports_and_plots(df, args):
                 best_row = mod_df.loc[mod_df['Accuracy'].idxmax()]
                 f.write(f"- **{model}**: Prefers **{best_row['frame']}** frame & **{best_row['strategy']}** strategy (**{best_row['Accuracy']*100:.1f}%**)\n")
 
-        f.write("\n## Strategy Performance per Model\n")
+        f.write("\n## Strategy Performance per Model (Raw Accuracy)\n")
         strat_mod = agg.groupby(['verifier', 'strategy'])['Accuracy'].mean().unstack()
         f.write("| Model | " + " | ".join(strat_mod.columns) + " |\n")
         f.write("|-------|" + "|".join(["---"] * len(strat_mod.columns)) + "|\n")
         for model, row in strat_mod.iterrows():
             f.write(f"| **{model}** | " + " | ".join([f"{v*100:.1f}%" for v in row]) + " |\n")
+            
+        f.write("\n## Strategy Performance per Model (Adjusted Accuracy)\n")
+        strat_mod_adj = agg.groupby(['verifier', 'strategy'])['Adjusted_Accuracy'].mean().unstack()
+        f.write("| Model | " + " | ".join(strat_mod_adj.columns) + " |\n")
+        f.write("|-------|" + "|".join(["---"] * len(strat_mod_adj.columns)) + "|\n")
+        for model, row in strat_mod_adj.iterrows():
+            f.write(f"| **{model}** | " + " | ".join([f"{v*100:.1f}%" for v in row]) + " |\n")
 
-        write_breakdown_section(f, "1. Comprehensive Accuracy Breakdown", agg, 'Accuracy', is_percent=True, invert_good=False)
+        write_breakdown_section(f, "1. Comprehensive Accuracy Breakdown (Raw)", agg, 'Accuracy', is_percent=True, invert_good=False)
+        write_breakdown_section(f, "1b. Comprehensive Accuracy Breakdown (Adjusted)", agg, 'Adjusted_Accuracy', is_percent=True, invert_good=False)
         write_breakdown_section(f, "2. Formatting Failure Rates (NaN / Instructions Missed)", agg, 'Formatting_Failure_Rate', is_percent=True, invert_good=True)
         write_breakdown_section(f, "3. Verbosity Analysis (Average Characters)", agg, 'Avg_Verbosity', is_percent=False, invert_good=False)
         
@@ -473,7 +526,7 @@ def generate_reports_and_plots(df, args):
                 "(same actual authorship, different label) isolates the pure *belief* effect. A gap between rows 1 and 3 "
                 "(same label, different truth) isolates the pure *reality* effect. Full data: `belief_vs_reality.csv`.\n")
 
-        f.write("\n## 7. Confusion Matrices (Visuals & Raw Data)\n")
+        f.write("\n## 9. Confusion Matrices (Visuals & Raw Data)\n")
         for verifier in sorted(df['verifier'].unique()):
             mod_df = df[df['verifier'] == verifier]
             tp = mod_df['tp'].sum()
@@ -488,16 +541,19 @@ def generate_reports_and_plots(df, args):
 
 def main():
     args = parse_args()
-    # Resolve mode: legacy --is_pilot overrides --mode if present
-    if getattr(args, "is_pilot", False):
-        args.mode = "pilot"
+        
     print("Grading generated candidates against ground truth...")
     graded = load_and_grade(args)
+    
+    print("Loading fuzzer override results...")
+    fuzz_dict = load_fuzz_results(args)
+    
     print("Analyzing verifications...")
-    df = analyze_verifications(args, graded)
+    df, fuzz_errors_removed = analyze_verifications(args, graded, fuzz_dict)
+    
     if not df.empty:
         print("Generating reports and plots...")
-        generate_reports_and_plots(df, args)
+        generate_reports_and_plots(df, args, fuzz_errors_removed)
     else:
         print("No verified data found to report on.")
 
