@@ -9,6 +9,7 @@ sys.stdout.reconfigure(encoding='utf-8')
 from models import generate_response, MODELS
 from prompts import get_verification_prompt
 from execution_grounding import run_candidate_code
+from science_utils import extract_option_map_from_question, parse_science_candidate_answer
 
 RAW_DATA_DIR = os.path.join("data", "raw")
 GEN_DATA_DIR = os.path.join("data", "generated")
@@ -25,6 +26,34 @@ async def verify_candidate(item, domain, verifier_model, generator_model, candid
     
     question = item["question"]
     prompt = get_verification_prompt(domain, question, candidate_answer, frame, strategy)
+
+    candidate_answer_parse = None
+
+    if domain == "science":
+        option_map = item.get("option_map") or extract_option_map_from_question(question)
+        candidate_answer_parse = parse_science_candidate_answer(candidate_answer, option_map)
+
+        parse_lines = ["[SCIENCE ANSWER PARSE]"]
+
+        if candidate_answer_parse.get("letter"):
+            parse_lines.append(f"Detected final selected option: {candidate_answer_parse['letter']}")
+        else:
+            parse_lines.append("Detected final selected option: NONE")
+
+        if candidate_answer_parse.get("option_text"):
+            parse_lines.append(f"Detected option text: {candidate_answer_parse['option_text']}")
+
+        if candidate_answer_parse.get("confidence"):
+            parse_lines.append(f"Extraction confidence: {candidate_answer_parse['confidence']}")
+
+        if candidate_answer_parse.get("ambiguous"):
+            parse_lines.append("Extraction status: AMBIGUOUS")
+
+        parse_lines.append(
+            "Use this parse as an audit signal. If the candidate's reasoning sounds plausible but its final selected option is wrong, missing, ambiguous, or inconsistent with the reasoning, mark it incorrect."
+        )
+
+        prompt = prompt + "\n\n" + "\n".join(parse_lines)
 
     execution_result = None
     if domain == "code":
@@ -132,6 +161,12 @@ async def verify_candidate(item, domain, verifier_model, generator_model, candid
         "raw_response": response_text,
         "parsed_verdict": parsed_verdict,
         "thinking_or_evaluation": parsed.get("thinking") or parsed.get("evaluation") or parsed.get("reason"),
+        "candidate_answer_letter": candidate_answer_parse.get("letter") if candidate_answer_parse else None,
+        "candidate_answer_text": candidate_answer_parse.get("option_text") if candidate_answer_parse else None,
+        "candidate_answer_extraction_mode": candidate_answer_parse.get("mode") if candidate_answer_parse else None,
+        "candidate_answer_extraction_confidence": candidate_answer_parse.get("confidence") if candidate_answer_parse else None,
+        "candidate_answer_ambiguous": candidate_answer_parse.get("ambiguous") if candidate_answer_parse else None,
+        "candidate_answer_parse_notes": candidate_answer_parse.get("notes") if candidate_answer_parse else None,
         "latency": latency,
         "prompt_tokens": prompt_tokens,
         "completion_tokens": completion_tokens,

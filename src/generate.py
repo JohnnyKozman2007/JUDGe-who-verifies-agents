@@ -21,7 +21,7 @@ async def generate_for_item(item, domain):
     model_names = list(MODELS.keys())
     for model in model_names:
         # temperature=0.0 for deterministic, reproducible generation.
-        tasks.append(generate_response(model, messages, temperature=0.0, max_tokens=1500))
+        tasks.append(generate_response(model, messages, temperature=0.0, max_tokens=2000))
         
     results = await asyncio.gather(*tasks)
     
