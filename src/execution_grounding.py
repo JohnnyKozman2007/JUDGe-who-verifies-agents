@@ -18,9 +18,22 @@ the verifier LLM - not report.py, which only analyzes results after the fact).
 import subprocess
 import tempfile
 import os
+import sys
 import re
 from dataclasses import dataclass, asdict
 from typing import Optional
+
+
+def _strip_markdown_fences(code: str) -> str:
+    """Remove ```python ... ``` wrapping if present."""
+    code = code.strip()
+    if code.startswith("```"):
+        lines = code.splitlines()
+        lines = lines[1:]  # drop opening fence
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]  # drop closing fence
+        return "\n".join(lines)
+    return code
 
 
 @dataclass
@@ -42,7 +55,8 @@ class ExecutionResult:
         lines.append(f"Exit status: {'SUCCESS (exit code 0)' if self.ran_successfully else 'FAILED (non-zero exit / exception)'}")
 
         if self.tests_total is not None:
-            lines.append(f"Assertions: {self.tests_passed}/{self.tests_total} passed")
+            passed = self.tests_passed if self.tests_passed is not None else 0
+            lines.append(f"Assertions: {passed}/{self.tests_total} passed")
 
         if self.stdout.strip():
             lines.append(f"STDOUT:\n{self.stdout.strip()[:1500]}")
@@ -101,6 +115,8 @@ def run_candidate_code(candidate_text: str, test_code: str, entry_point: Optiona
     if not candidate_text:
         return ExecutionResult(False, "", "", None, False, None, None)
 
+    candidate_text = _strip_markdown_fences(candidate_text)
+
     full_source = candidate_text + "\n\n" + test_code
     if entry_point:
         full_source += f"\ncheck({entry_point})\n"
@@ -112,7 +128,7 @@ def run_candidate_code(candidate_text: str, test_code: str, entry_point: Optiona
 
     try:
         result = subprocess.run(
-            ["python", tmp_name],
+            [sys.executable, tmp_name],
             capture_output=True,
             timeout=timeout,
             text=True
@@ -141,64 +157,10 @@ def run_candidate_code(candidate_text: str, test_code: str, entry_point: Optiona
             os.remove(tmp_name)
 
 
-def build_grounded_verifier_prompt(candidate_text: str, problem_statement: str,
-                                    execution: ExecutionResult, strategy: str,
-                                    frame_instruction: str) -> str:
-    """
-    Assembles the full verifier prompt with execution evidence injected, for each strategy.
-
-    frame_instruction: your existing self/observer/neutral ownership framing sentence -
-    pass it through unchanged, this only touches the evidence given to the verifier,
-    not the ownership manipulation itself.
-    """
-    evidence_block = execution.to_prompt_block()
-
-    header = f"""{frame_instruction}
-
-Problem:
-{problem_statement}
-
-Candidate code:
-```python
-{candidate_text}
-```
-
-{evidence_block}
-"""
-
-    if strategy == "direct":
-        instruction = "\nBased on the execution result above, is this code correct? Respond with only CORRECT or INCORRECT."
-    elif strategy == "cot":
-        instruction = (
-            "\nBased on the execution result above, reason step by step about whether the code correctly "
-            "solves the problem. Do not re-derive whether it runs - you already have the actual execution "
-            "result above; use it. Then give your final verdict as CORRECT or INCORRECT."
-        )
-    elif strategy == "rubric":
-        instruction = (
-            "\nUsing the execution result above, evaluate against this rubric:\n"
-            "1. Did the code run without crashing? (see Exit status above)\n"
-            "2. Did the output/assertions match what the problem requires?\n"
-            "3. Are there edge cases the execution result doesn't cover that could still be wrong?\n"
-            "Score each item, then give your final verdict as CORRECT or INCORRECT."
-        )
-    else:
-        raise ValueError(f"Unknown strategy: {strategy}")
-
-    return header + instruction
-
-
 if __name__ == "__main__":
     # Quick demo
     candidate = "def add(a, b):\n    return a - b  # bug: should be +"
     tests = "assert add(2, 3) == 5\nassert add(-1, 1) == 0"
     result = run_candidate_code(candidate, tests)
     print(result.to_prompt_block())
-    print()
-    print(build_grounded_verifier_prompt(
-        candidate_text=candidate,
-        problem_statement="Write a function that adds two numbers.",
-        execution=result,
-        strategy="cot",
-        frame_instruction="You are reviewing code that another model wrote."
-    ))
+

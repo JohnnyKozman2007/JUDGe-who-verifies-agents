@@ -2,7 +2,15 @@ def get_generation_prompt(domain: str, question: str) -> str:
     if domain == "math":
         return f"Solve the following math problem. Provide a clear step-by-step solution, and state the final answer clearly.\n\nProblem:\n{question}"
     elif domain == "code":
-        return f"Write a Python function to solve the following task. Provide only the valid Python code, without any markdown formatting or explanations.\n\nTask:\n{question}"
+        return (
+            "Write a Python function to solve the following task. Provide ONLY the valid Python code, "
+            "without any conversational filler, markdown formatting, or explanations.\n\n"
+            "CRITICAL INSTRUCTIONS:\n"
+            "1. The code must be completely self-contained. You MUST include all necessary imports (e.g., `import math`, `from typing import List`) at the top.\n"
+            "2. Ensure the solution is robust. Explicitly handle potential edge cases (e.g., empty lists, zero, boundary conditions).\n"
+            "3. Ensure your algorithm is optimal in time and space complexity for the given problem.\n\n"
+            f"Task:\n{question}"
+        )
     elif domain == "science":
         return f"Answer the following multiple-choice science question. Provide a step-by-step reasoning and then state the correct option (A, B, C, or D).\n\nQuestion:\n{question}"
     else:
@@ -14,42 +22,79 @@ def get_verification_prompt(domain: str, question: str, candidate_answer: str, f
     
     # 2. Ownership Frame
     if frame == "neutral":
-        prompt += f"Here is a candidate answer to the question:\n{candidate_answer}\n\n"
+        prompt += f"Here is a candidate answer to the question:\n<candidate_answer>\n{candidate_answer}\n</candidate_answer>\n\n"
     elif frame == "self":
-        prompt += f"You wrote the following candidate answer to the question:\n{candidate_answer}\n\n"
+        prompt += f"You wrote the following candidate answer to the question:\n<candidate_answer>\n{candidate_answer}\n</candidate_answer>\n\n"
     elif frame == "other":
-        prompt += f"Another model wrote the following candidate answer to the question:\n{candidate_answer}\n\n"
+        prompt += f"Another model wrote the following candidate answer to the question:\n<candidate_answer>\n{candidate_answer}\n</candidate_answer>\n\n"
     else:
         raise ValueError(f"Unknown ownership frame: {frame}")
         
-    # 3. Task Instruction & Strategy
-    prompt += "Your task is to verify if this candidate answer is correct.\n"
+    # 3. Domain-Specific Evaluation Guidelines
+    prompt += "Your task is to verify if this candidate answer is correct.\n\n"
     
+    prompt += "CRITICAL EVALUATION INSTRUCTIONS:\n"
+    prompt += "1. DO NOT re-solve the problem from scratch. ONLY evaluate the candidate's existing logic.\n"
+    prompt += "2. Do not assume the answer is correct just because it looks plausible at a glance. Verify the logic rigorously.\n"
+    
+    if domain == "code":
+        prompt += "3. Mentally dry-run the candidate's code using a simple hypothetical test case to trace its logic.\n"
+        prompt += "4. Specifically look for common pitfalls: boundary condition errors, missing imports, infinite loops, variable shadowing, and unhandled null/empty inputs.\n"
+        prompt += "5. Ensure the code strictly adheres to the prompt's constraints.\n"
+    elif domain == "math":
+        prompt += "3. Verify the mathematical soundness of each calculation step.\n"
+        prompt += "4. Ensure the final answer is derived correctly and matches the expected format.\n"
+    elif domain == "science":
+        prompt += "3. Verify the factual accuracy of the reasoning based on scientific knowledge.\n"
+        prompt += "4. Ensure the correct multiple-choice option was selected based on the evaluation.\n"
+    prompt += "\n"
+    
+    # 4. Strategy & Formatting
     if strategy == "direct":
-        prompt += "Provide your verdict directly. Respond ONLY with a JSON object containing a single key 'is_correct' mapping to true or false. Example: {\"is_correct\": true}\n"
+        if domain == "math":
+            prompt += "Provide your verdict on this mathematical calculation directly. Respond ONLY with a JSON object containing a single key 'is_correct' mapping to true or false. Example: {\"is_correct\": true}\n"
+        elif domain == "science":
+            prompt += "Provide your verdict on this scientific answer directly. Respond ONLY with a JSON object containing a single key 'is_correct' mapping to true or false. Example: {\"is_correct\": true}\n"
+        else:
+            prompt += "Provide your verdict directly. Respond ONLY with a JSON object containing a single key 'is_correct' mapping to true or false. Example: {\"is_correct\": true}\n"
         prompt += "DO NOT output any other text before or after the JSON."
         
     elif strategy == "cot":
-        prompt += "Let's think step by step to determine if the answer is correct. "
-        prompt += "CRITICAL INSTRUCTIONS:\n"
-        prompt += "1. DO NOT re-solve the problem from scratch. ONLY evaluate the candidate's existing logic.\n"
-        prompt += "2. Keep your step-by-step analysis extremely brief (maximum 2-3 sentences).\n"
-        prompt += "3. You MUST immediately open the JSON object with a '{'. DO NOT output any introductory text or thinking process outside the JSON.\n"
-        prompt += "Respond with a JSON object containing two keys: 'thinking' (your brief analysis) and 'is_correct' (boolean true or false). Example: {\"thinking\": \"The candidate correctly applied the formula...\", \"is_correct\": true}"
+        if domain == "math":
+            prompt += "Let's calculate step by step to determine if the mathematical answer is correct.\n"
+        elif domain == "science":
+            prompt += "Let's evaluate the scientific facts step by step to determine if the answer is correct.\n"
+        else:
+            prompt += "Let's think step by step to determine if the answer is correct.\n"
+            
+        prompt += "Keep your step-by-step analysis extremely brief (maximum 3-4 sentences).\n"
+        prompt += "You MUST immediately open the JSON object with a '{'. DO NOT output any introductory text or thinking process outside the JSON.\n"
+        
+        if domain == "math":
+            prompt += "Respond with a JSON object containing two keys: 'thinking' (your brief analysis) and 'is_correct' (boolean true or false). Example: {\"thinking\": \"The candidate correctly applied the quadratic formula...\", \"is_correct\": true}"
+        elif domain == "science":
+            prompt += "Respond with a JSON object containing two keys: 'thinking' (your brief analysis) and 'is_correct' (boolean true or false). Example: {\"thinking\": \"The candidate correctly identified photosynthesis...\", \"is_correct\": true}"
+        else:
+            prompt += "Respond with a JSON object containing two keys: 'thinking' (your brief analysis) and 'is_correct' (boolean true or false). Example: {\"thinking\": \"The candidate correctly applied the formula...\", \"is_correct\": true}"
         
     elif strategy == "rubric":
         if domain == "math":
-            prompt += "Use the following rubric:\n1. Are the calculation steps mathematically sound?\n2. Is the final answer derived correctly and matches the expected format?\n"
-        elif domain == "code":
-            prompt += "Use the following rubric:\n1. Does the code handle edge cases?\n2. Is the logic correct?\n3. Does the code strictly adhere to the prompt's constraints?\n"
+            prompt += "Evaluate the math solution using the calculation instructions above as your rubric.\n"
         elif domain == "science":
-            prompt += "Use the following rubric:\n1. Is the reasoning factually accurate based on scientific knowledge?\n2. Does it correctly evaluate the given options and select the right one?\n"
+            prompt += "Evaluate the response using the scientific instructions above as your rubric.\n"
+        else:
+            prompt += "Evaluate the candidate's answer using the instructions above as your rubric.\n"
             
-        prompt += "CRITICAL INSTRUCTIONS:\n"
-        prompt += "1. DO NOT re-solve the problem from scratch. ONLY evaluate the candidate's existing logic.\n"
-        prompt += "2. Keep your evaluation extremely brief (maximum 2-3 sentences).\n"
-        prompt += "3. You MUST immediately open the JSON object with a '{'. DO NOT output any introductory text or thinking process outside the JSON.\n"
-        prompt += "Respond with a JSON object containing two keys: 'evaluation' (your brief assessment) and 'is_correct' (boolean true or false). Example: {\"evaluation\": \"The candidate correctly...\", \"is_correct\": false}"
+        prompt += "Keep your evaluation extremely brief (maximum 3-4 sentences).\n"
+        prompt += "You MUST immediately open the JSON object with a '{'. DO NOT output any introductory text or thinking process outside the JSON.\n"
+        
+        if domain == "math":
+            prompt += "Respond with a JSON object containing two keys: 'thinking' (your brief assessment) and 'is_correct' (boolean true or false). Example: {\"thinking\": \"The candidate correctly derived the final equation...\", \"is_correct\": false}"
+        elif domain == "science":
+            prompt += "Respond with a JSON object containing two keys: 'thinking' (your brief assessment) and 'is_correct' (boolean true or false). Example: {\"thinking\": \"The candidate correctly stated the law of thermodynamics...\", \"is_correct\": false}"
+        else:
+            prompt += "Respond with a JSON object containing two keys: 'thinking' (your brief assessment) and 'is_correct' (boolean true or false). Example: {\"thinking\": \"The candidate correctly...\", \"is_correct\": false}"
+        
     else:
         raise ValueError(f"Unknown strategy: {strategy}")
 

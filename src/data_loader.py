@@ -1,7 +1,7 @@
 import os
 import json
+import random
 from datasets import load_dataset
-import pandas as pd
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -65,7 +65,6 @@ def load_science(mode):
         # We need to present the options randomly, but GPQA already has Incorrect Answer 1, etc.
         # So let's just present them and the correct answer. 
         # For simplicity, we just provide the question and ask for the correct answer, or present options.
-        import random
         random.seed(42 + i)
         
         options = [
