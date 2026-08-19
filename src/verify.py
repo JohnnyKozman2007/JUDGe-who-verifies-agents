@@ -9,7 +9,6 @@ sys.stdout.reconfigure(encoding='utf-8')
 from models import generate_response, MODELS
 from prompts import get_verification_prompt
 from execution_grounding import run_candidate_code
-import traceback
 
 RAW_DATA_DIR = os.path.join("data", "raw")
 GEN_DATA_DIR = os.path.join("data", "generated")

@@ -17,11 +17,10 @@ async def generate_for_item(item, domain):
     ]
     
     tasks = []
-    # Qwen, DeepSeek, GLM
+    # Qwen, DeepSeek, Llama, Mistral
     model_names = list(MODELS.keys())
     for model in model_names:
-        # We use temperature=0.7 for generation to get some diversity, 
-        # though standard might be 0 for reproducibility. I will use 0 to be consistent with the instructions.
+        # temperature=0.0 for deterministic, reproducible generation.
         tasks.append(generate_response(model, messages, temperature=0.0, max_tokens=1500))
         
     results = await asyncio.gather(*tasks)
