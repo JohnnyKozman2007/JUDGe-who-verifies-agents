@@ -22,17 +22,26 @@ if __name__ == "__main__":
     
     script_args = ["--mode", args.mode, "--domain", args.domain]
 
+    # Ask for all inputs upfront so the script can run unattended
+    print("\n--- Pipeline Configuration ---")
+    overwrite_gen_input = input("Redo generation of answers? This will delete existing generated data and start fresh. (y/n): ")
+    overwrite_ver_input = input("Redo verification? This will delete existing verification data and start fresh. (y/n): ")
+    overwrite_val_input = input("Redo validation? This will delete existing validation data and start fresh. (y/n): ")
+    
+    gen_args = script_args + (["--overwrite"] if overwrite_gen_input.lower().strip() == 'y' else [])
+    ver_args = script_args + (["--overwrite"] if overwrite_ver_input.lower().strip() == 'y' else [])
+    val_args = script_args + (["--overwrite"] if overwrite_val_input.lower().strip() == 'y' else [])
+
     # Step 1: Load Data (always runs, resumes automatically — only fetches missing items)
     run_script(os.path.join(src_dir, "data_loader.py"), script_args)
     
     # Step 2: Generate candidate answers
-    overwrite_gen = input("\nRedo generation of answers? This will delete existing generated data and start fresh. (y/n): ")
-    gen_args = script_args + (["--overwrite"] if overwrite_gen.lower().strip() == 'y' else [])
     run_script(os.path.join(src_dir, "generate.py"), gen_args)
     
     # Step 3: Run verifications
-    overwrite_ver = input("\nRedo verification? This will delete existing verification data and start fresh. (y/n): ")
-    ver_args = script_args + (["--overwrite"] if overwrite_ver.lower().strip() == 'y' else [])
     run_script(os.path.join(src_dir, "verify.py"), ver_args)
+    
+    # Step 4: Validate override/missed-failure cases (code domain only).
+    run_script(os.path.join(src_dir, "validate_overrides.py"), val_args)
     
     print(f"\n{args.mode.capitalize()} run for domain '{args.domain}' completed successfully.")

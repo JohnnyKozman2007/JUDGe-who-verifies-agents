@@ -59,9 +59,19 @@ async def process_domain(domain="code", is_pilot=True):
     if not verified_rows:
         print(f"No verified data found for {domain} yet - nothing to validate.")
         return
+        
+    print(f"[{domain}] Scanning {len(verified_rows)} verified records to find disagreement cases...")
 
     overrides_path = os.path.join(OUT_DIR, f"{domain}_overrides{suffix}")
     missed_path = os.path.join(OUT_DIR, f"{domain}_missed_failures{suffix}")
+
+    if overwrite:
+        if os.path.exists(overrides_path):
+            os.remove(overrides_path)
+            print(f"Deleted {overrides_path} and starting fresh.")
+        if os.path.exists(missed_path):
+            os.remove(missed_path)
+            print(f"Deleted {missed_path} and starting fresh.")
 
     done_overrides = _already_done(overrides_path)
     done_missed = _already_done(missed_path)
@@ -70,75 +80,104 @@ async def process_domain(domain="code", is_pilot=True):
     new_overrides = 0
     new_missed = 0
 
-    with open(overrides_path, "a", encoding="utf-8") as f_over, \
-         open(missed_path, "a", encoding="utf-8") as f_missed:
+    # Collect all tasks first
+    fuzz_tasks = []
+    missed_records = []
+    
+    total_rows = len(verified_rows)
 
-        for row in verified_rows:
-            key = (row["item_id"], row["generator_model"], row["verifier_model"], row["frame"], row["strategy"])
-            raw_item = raw_items.get(row["item_id"])
-            gen_item = gen_items.get(row["item_id"])
-            if raw_item is None or gen_item is None:
+    for idx, row in enumerate(verified_rows, 1):
+        if idx % 500 == 0:
+            print(f"[{domain}] Scanned {idx} / {total_rows} verifications...")
+            
+        key = (row["item_id"], row["generator_model"], row["verifier_model"], row["frame"], row["strategy"])
+        raw_item = raw_items.get(row["item_id"])
+        gen_item = gen_items.get(row["item_id"])
+        if raw_item is None or gen_item is None:
+            continue
+
+        candidate_code = gen_item.get("candidates", {}).get(row["generator_model"])
+        test_code = raw_item.get("test")
+        entry_point = raw_item.get("entry_point")
+        ground_truth = raw_item.get("ground_truth")
+        question = raw_item.get("question", "")
+        if not (candidate_code and test_code and entry_point):
+            continue
+
+        execution_passed = row.get("execution_ran_successfully")
+        verifier_said_correct = row.get("parsed_verdict")
+        if execution_passed is None or verifier_said_correct is None:
+            continue
+
+        # --- Case 1: test passed, verifier said incorrect (override) ---
+        if execution_passed is True and verifier_said_correct is False:
+            if key in done_overrides:
                 continue
-
-            candidate_code = gen_item.get("candidates", {}).get(row["generator_model"])
-            test_code = raw_item.get("test")
-            entry_point = raw_item.get("entry_point")
-            ground_truth = raw_item.get("ground_truth")
-            question = raw_item.get("question", "")
-            if not (candidate_code and test_code and entry_point):
-                continue
-
-            execution_passed = row.get("execution_ran_successfully")
-            verifier_said_correct = row.get("parsed_verdict")
-            if execution_passed is None or verifier_said_correct is None:
-                continue  # ungrounded or unparsed row, nothing to compare
-
-            # --- Case 1: test passed, verifier said incorrect (override) ---
-            if execution_passed is True and verifier_said_correct is False:
-                if key in done_overrides:
-                    continue
-                fuzz_result = await differential_test(
-                    item_id=row["item_id"], candidate_code=candidate_code,
-                    reference_code=ground_truth, entry_point=entry_point, question=question,
+            
+            async def run_fuzz(r=row, c=candidate_code, g=ground_truth, e=entry_point, q=question):
+                f_res = await differential_test(
+                    item_id=r["item_id"], candidate_code=c,
+                    reference_code=g, entry_point=e, question=q,
                 )
-                record = {
-                    "item_id": row["item_id"],
-                    "generator_model": row["generator_model"],
-                    "verifier_model": row["verifier_model"],
-                    "frame": row["frame"],
-                    "strategy": row["strategy"],
-                    "candidate_code": candidate_code,
-                    "verifier_reasoning": row.get("thinking_or_evaluation"),
-                    "fuzz_verdict": fuzz_result.verdict,
-                    "fuzz_num_trials": fuzz_result.num_trials,
-                    "fuzz_note": fuzz_result.note,
+                return {
+                    "item_id": r["item_id"],
+                    "generator_model": r["generator_model"],
+                    "verifier_model": r["verifier_model"],
+                    "frame": r["frame"],
+                    "strategy": r["strategy"],
+                    "candidate_code": c,
+                    "verifier_reasoning": r.get("thinking_or_evaluation"),
+                    "fuzz_verdict": f_res.verdict,
+                    "fuzz_num_trials": f_res.num_trials,
+                    "fuzz_note": f_res.note,
                     "fuzz_mismatches": [
                         {"inputs": t.inputs, "candidate_result": t.candidate_result,
                          "reference_result": t.reference_result,
                          "candidate_error": t.candidate_error, "reference_error": t.reference_error}
-                        for t in fuzz_result.trials if not t.match
+                        for t in f_res.trials if not t.match
                     ],
                 }
-                f_over.write(json.dumps(record) + "\n")
-                new_overrides += 1
+            fuzz_tasks.append(run_fuzz())
 
-            # --- Case 2: test failed, verifier said correct (missed failure) ---
-            elif execution_passed is False and verifier_said_correct is True:
-                if key in done_missed:
-                    continue
-                exec_result = run_candidate_code(candidate_code, test_code, entry_point=entry_point)
-                record = {
-                    "item_id": row["item_id"],
-                    "generator_model": row["generator_model"],
-                    "verifier_model": row["verifier_model"],
-                    "frame": row["frame"],
-                    "strategy": row["strategy"],
-                    "candidate_code": candidate_code,
-                    "verifier_reasoning": row.get("thinking_or_evaluation"),
-                    "actual_execution_error": exec_result.traceback_summary or exec_result.stderr,
-                }
-                f_missed.write(json.dumps(record) + "\n")
-                new_missed += 1
+        # --- Case 2: test failed, verifier said correct (missed failure) ---
+        elif execution_passed is False and verifier_said_correct is True:
+            if key in done_missed:
+                continue
+            
+            # This is a synchronous execution and might take 1-5 seconds per failure!
+            exec_result = run_candidate_code(candidate_code, test_code, entry_point=entry_point)
+
+            missed_records.append({
+                "item_id": row["item_id"],
+                "generator_model": row["generator_model"],
+                "verifier_model": row["verifier_model"],
+                "frame": row["frame"],
+                "strategy": row["strategy"],
+                "candidate_code": candidate_code,
+                "verifier_reasoning": row.get("thinking_or_evaluation"),
+                "actual_execution_error": exec_result.traceback_summary or exec_result.stderr,
+            })
+
+    # Write missed records immediately (no async execution needed for them)
+    if missed_records:
+        with open(missed_path, "a", encoding="utf-8") as f_missed:
+            for rec in missed_records:
+                f_missed.write(json.dumps(rec) + "\n")
+        new_missed += len(missed_records)
+
+    # Process fuzz tasks in concurrent batches
+    batch_size = 10
+    if fuzz_tasks:
+        print(f"[{domain}] Found {len(fuzz_tasks)} pending override tasks. Processing in batches of {batch_size}...")
+        with open(overrides_path, "a", encoding="utf-8") as f_over:
+            for i in range(0, len(fuzz_tasks), batch_size):
+                batch = fuzz_tasks[i:i+batch_size]
+                batch_results = await asyncio.gather(*batch)
+                for rec in batch_results:
+                    f_over.write(json.dumps(rec) + "\n")
+                f_over.flush()
+                new_overrides += len(batch_results)
+                print(f"Validated {new_overrides} / {len(fuzz_tasks)} pending overrides...")
 
     if new_overrides == 0 and new_missed == 0 and not had_prior_data:
         print(f"[{domain}] No disagreement cases found - nothing to validate.")
@@ -151,11 +190,11 @@ async def process_domain(domain="code", is_pilot=True):
             print(f"[{domain}] Already up to date - nothing new since last run.")
 
 
-async def main(is_pilot=True, domains=None):
+async def main(is_pilot=True, domains=None, overwrite=False):
     if domains is None:
         domains = ["math", "code", "science"]
     for domain in domains:
-        await process_domain(domain, is_pilot=is_pilot)
+        await process_domain(domain, is_pilot=is_pilot, overwrite=overwrite)
 
 
 if __name__ == "__main__":
@@ -164,8 +203,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode", type=str, choices=["pilot", "actual"], default="pilot")
     parser.add_argument("--domain", type=str, choices=["all", "math", "code", "science"], default="all")
+    parser.add_argument("--overwrite", action="store_true", help="Delete existing output and start fresh")
     args = parser.parse_args()
 
     is_pilot = args.mode == "pilot"
     domains = ["math", "code", "science"] if args.domain == "all" else [args.domain]
-    asyncio.run(main(is_pilot=is_pilot, domains=domains))
+    asyncio.run(main(is_pilot=is_pilot, domains=domains, overwrite=args.overwrite))
