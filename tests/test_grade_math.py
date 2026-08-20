@@ -56,6 +56,29 @@ class CorrectAnswersMustPass(unittest.TestCase):
         self.assertTrue(grade_math("After simplifying, the answer is 3/4.", r"\boxed{3/4}"))
 
 
+class AnswerTagIsTheStrongestSignal(unittest.TestCase):
+    """The math generation prompt now requires <answer></answer>. The tag outranks
+    every other extraction path."""
+
+    def test_tag_is_used(self):
+        self.assertTrue(grade_math("Working: 2x = 8, x = 4.\n<answer>4</answer>", r"\boxed{4}"))
+
+    def test_tag_beats_a_matching_intermediate_value(self):
+        self.assertFalse(grade_math("We had 5 apples, then 8.\n<answer>8</answer>", r"\boxed{5}"))
+
+    def test_tag_outranks_boxed(self):
+        self.assertFalse(grade_math(r"\boxed{5} but actually <answer>8</answer>", r"\boxed{5}"))
+
+    def test_last_tag_wins_when_the_example_is_echoed(self):
+        # A model may repeat the prompt's own example before giving its real answer.
+        text = "Format reminder: <answer>3/4</answer>. My solution gives 12.\n<answer>12</answer>"
+        self.assertTrue(grade_math(text, r"\boxed{12}"))
+        self.assertFalse(grade_math(text, r"\boxed{3/4}"))
+
+    def test_fraction_inside_tag(self):
+        self.assertTrue(grade_math("Simplifying gives\n<answer>3/4</answer>", r"\boxed{3/4}"))
+
+
 class IntermediateValuesMustNotCount(unittest.TestCase):
     """Issue #3: the ground truth appearing in the working must not grade as correct."""
 
