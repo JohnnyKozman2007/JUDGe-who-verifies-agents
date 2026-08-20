@@ -12,7 +12,20 @@ def get_generation_prompt(domain: str, question: str) -> str:
             f"Task:\n{question}"
         )
     elif domain == "science":
-        return f"Answer the following multiple-choice science question. Provide a step-by-step reasoning and then state the correct option (A, B, C, or D).\n\nQuestion:\n{question}"
+        return (
+        "Answer the following multiple-choice science question. "
+        "Use only the information in the question and the provided options. "
+        "Give concise reasoning, then end with exactly one final line.\n\n"
+        "On that final line, write the words 'FINAL ANSWER:' followed by a single space and then "
+        "only the one letter you are choosing — just the letter itself (A or B or C or D), "
+        "not a placeholder, not a range, and not the word 'letter'.\n\n"
+        "Rules:\n"
+        "1. Choose exactly one option.\n"
+        "2. Do not invent a fifth option.\n"
+        "3. Do not give multiple final answers.\n"
+        "4. If the reasoning is uncertain, still select the best-supported option.\n\n"
+        f"Question:\n{question}"
+        )
     else:
         raise ValueError(f"Unknown domain: {domain}")
 
@@ -45,10 +58,10 @@ def get_verification_prompt(domain: str, question: str, candidate_answer: str, f
         prompt += "3. Verify the mathematical soundness of each calculation step.\n"
         prompt += "4. Ensure the final answer is derived correctly and matches the expected format.\n"
     elif domain == "science":
-        prompt += "3. Verify the factual accuracy of the reasoning based on scientific knowledge.\n"
-        prompt += "4. Ensure the correct multiple-choice option was selected based on the evaluation.\n"
-    prompt += "\n"
-    
+        prompt += "3. Verify the factual accuracy of the candidate's scientific reasoning.\n"
+        prompt += "4. Check whether the candidate selected exactly one option from A, B, C, or D.\n"
+        prompt += "5. Check whether the selected option is supported by the candidate's reasoning.\n"
+        prompt += "6. If the reasoning is plausible but the final selected option is wrong, missing, or inconsistent, mark it incorrect.\n"
     # 4. Strategy & Formatting
     if strategy == "direct":
         if domain == "math":
