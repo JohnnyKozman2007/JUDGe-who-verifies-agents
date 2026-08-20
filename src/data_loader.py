@@ -3,6 +3,7 @@ import json
 import random
 from datasets import load_dataset
 from dotenv import load_dotenv
+from science_utils import build_option_map, render_science_question, validate_science_options
 
 load_dotenv()
 
@@ -50,43 +51,61 @@ def load_code(mode):
 
 def load_science(mode):
     print("Loading GPQA-Diamond dataset...")
-    # GPQA Diamond requires HF Token
     token = os.environ.get("HF_TOKEN")
-    ds = load_dataset('Idavidrein/gpqa', 'gpqa_diamond', split='train', token=token)
-    
+    if not token:
+        raise RuntimeError(
+            "HF_TOKEN is missing. GPQA-Diamond is gated, so add HF_TOKEN to your .env file before loading science data."
+        )
+    ds = load_dataset("Idavidrein/gpqa", "gpqa_diamond", split="train", token=token)
     num_samples = 10 if mode == "pilot" else 150
-    sampled = ds.shuffle(seed=42).select(range(num_samples))
-    
+    sampled = ds.shuffle(seed=42)
     standardized = []
-    for i, item in enumerate(sampled):
-        # Format the question as multiple choice
-        question_text = item["Question"] + "\nOptions:\n"
-        
-        # We need to present the options randomly, but GPQA already has Incorrect Answer 1, etc.
-        # So let's just present them and the correct answer. 
-        # For simplicity, we just provide the question and ask for the correct answer, or present options.
-        random.seed(42 + i)
-        
+    skipped = []
+    for item in sampled:
+        if len(standardized) >= num_samples:
+            break
+        item_index = len(standardized)
+        random.seed(42 + item_index)
         options = [
-            item["Correct Answer"],
-            item["Incorrect Answer 1"],
-            item["Incorrect Answer 2"],
-            item["Incorrect Answer 3"]
+            str(item["Correct Answer"]).strip(),
+            str(item["Incorrect Answer 1"]).strip(),
+            str(item["Incorrect Answer 2"]).strip(),
+            str(item["Incorrect Answer 3"]).strip(),
         ]
         random.shuffle(options)
-        
-        for j, opt in enumerate(options):
-            question_text += f"{chr(65+j)}. {opt}\n"
-            
-        correct_letter = chr(65 + options.index(item["Correct Answer"]))
-        
+        issues = validate_science_options(options)
+        if issues:
+            skipped.append({
+                "question_preview": str(item["Question"])[:120],
+                "issues": issues,
+            })
+            continue
+        option_map = build_option_map(options)
+        question_text = render_science_question(str(item["Question"]), options)
+        correct_letter = next(
+            label for label, option_text in option_map.items()
+            if option_text == str(item["Correct Answer"]).strip()
+        )
         standardized.append({
-            "item_id": f"science_{i}",
+            "item_id": f"science_{item_index}",
             "domain": "science",
+            "question_stem": str(item["Question"]).strip(),
             "question": question_text,
             "ground_truth": correct_letter,
-            "correct_answer_text": item["Correct Answer"]
+            "correct_answer_text": str(item["Correct Answer"]).strip(),
+            "option_map": option_map,
+            "options": [option_map[chr(65 + idx)] for idx in range(4)],
+            "source_dataset": "Idavidrein/gpqa:gpqa_diamond",
         })
+    if len(standardized) < num_samples:
+        raise RuntimeError(
+            f"Could only prepare {len(standardized)} valid science items out of requested {num_samples}. "
+            f"Skipped {len(skipped)} malformed items."
+        )
+    if skipped:
+        print(f"Skipped {len(skipped)} malformed GPQA items while building the science split.")
+        for skipped_item in skipped[:5]:
+            print(f"  - {skipped_item['issues']} | {skipped_item['question_preview']}...")
     return standardized
 
 def save_data(data, domain, mode):
