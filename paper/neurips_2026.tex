@@ -7,7 +7,7 @@
 % The authors should use one of these tracks.
 % Before accepting by the NeurIPS conference, select one of the options below.
 % 0. "default" for submission
-\usepackage{neurips_2026}
+% \usepackage{neurips_2026}
 % the "default" option is equal to the "main" option, which is used for the Main Track with double-blind reviewing.
 % 1. "main" option is used for the Main Track
 %  \usepackage[main]{neurips_2026}
@@ -20,7 +20,7 @@
 % 5. "sglblindworkshop" option is used for the Workshop with single-blind reviewing
  % \usepackage[sglblindworkshop]{neurips_2026}
 % 6. "dblblindworkshop" option is used for the Workshop with double-blind reviewing
-%  \usepackage[dblblindworkshop]{neurips_2026}
+ \usepackage[dblblindworkshop]{neurips_2026}
 % 7. "education" option is used for the Education Track
 %  \usepackage[education]{neurips_2026}
 
@@ -40,15 +40,15 @@
 %  \usepackage[dblblindworkshop, final]{neurips_2026}
 % Note. For the workshop paper template, both \title{} and \workshoptitle{} are required, with the former indicating the paper title shown in the title and the latter indicating the workshop title displayed in the footnote.
 % For workshops (5., 6.), the authors should add the name of the workshop, "\workshoptitle" command is used to set the workshop title.
-% \workshoptitle{WORKSHOP TITLE}
+\workshoptitle{JUDGe: Can We Trust the Judge? — NeurIPS 2026 Workshop}
 % 7. Education Track
 % \usepackage[education, final]{neurips_2026}
 
 % "preprint" option is used for arXiv or other preprint submissions
  % \usepackage[preprint]{neurips_2026}
 
-% to avoid loading the natbib package, add option nonatbib:
-%    \usepackage[nonatbib]{neurips_2026}
+% % to avoid loading the natbib package, add option nonatbib:
+% \usepackage[nonatbib]{neurips_2026}
 
 \usepackage[utf8]{inputenc} % allow utf-8 input
 \usepackage[T1]{fontenc}    % use 8-bit T1 fonts
@@ -61,7 +61,7 @@
 \usepackage{xcolor}         % colors
 
 % Note. For the workshop paper template, both \title{} and \workshoptitle{} are required, with the former indicating the paper title shown in the title and the latter indicating the workshop title displayed in the footnote. 
-\title{Formatting Instructions For NeurIPS 2026}
+\title{Biased LLM Judges: Authorship Framing Effects in Model-Based Verification}
 
 
 % The \author macro works with any number of authors. There are two commands
@@ -73,37 +73,19 @@
 % \AND instead of \And before the third author name.
 
 
-\author{%
-  David S.~Hippocampus\thanks{Use footnote for providing further information
-    about author (webpage, alternative address)---\emph{not} for acknowledging
-    funding agencies.} \\
-  Department of Computer Science\\
-  Cranberry-Lemon University\\
-  Pittsburgh, PA 15213 \\
-  \texttt{hippo@cs.cranberry-lemon.edu} \\
-  % examples of more authors
-  % \And
-  % Coauthor \\
-  % Affiliation \\
-  % Address \\
-  % \texttt{email} \\
-  % \AND
-  % Coauthor \\
-  % Affiliation \\
-  % Address \\
-  % \texttt{email} \\
-  % \And
-  % Coauthor \\
-  % Affiliation \\
-  % Address \\
-  % \texttt{email} \\
-  % \And
-  % Coauthor \\
-  % Affiliation \\
-  % Address \\
-  % \texttt{email} \\
+\author{
+  Arushi Waddepalli \\
+  IIIT Lucknow \\
+  \texttt{lit2024009@iiitl.ac.in} \\
+  \And
+  Johnny Kozman \\
+  University of Hertfordshire \\
+  \texttt{jg25abs@herts.ac.uk} \\
+  \And
+  Tilak Parajuli \\
+  Tribhuvan University \\
+  \texttt{tilak.765421@bkmc.tu.edu.np} \\
 }
-
 
 \begin{document}
 
@@ -112,339 +94,351 @@
 
 
 \begin{abstract}
-  The abstract paragraph should be indented \nicefrac{1}{2}~inch (3~picas) on both the left- and right-hand margins. Use 10~point type, with a vertical spacing (leading) of 11~points. The word \textbf{Abstract} must be centered, bold, and in point size 12. Two line spaces precede the abstract. The abstract must be limited to one paragraph.
+  %The abstract paragraph should be indented \nicefrac{1}{2}~inch (3~picas) on both the left- and right-hand margins. Use 10~point type, with a vertical spacing (leading) of 11~points. The word \textbf{Abstract} must be centered, bold, and in point size 12. Two line spaces precede the abstract. The abstract must be limited to one paragraph.%
+  LLM-as-a-judge systems are increasingly used to evaluate model outputs, agent decisions, and benchmark submissions, yet they are often treated as socially neutral measurement instruments. We study whether perceived authorship changes how LLM verifiers judge correctness. In a controlled generator-verifier experiment across math, code, and science tasks, we use Qwen2.5-72B-Instruct, DeepSeek-V3, Llama-3.3-70B-Instruct-Turbo, and Mistral-Nemo-Instruct-2407 as both generators and verifiers. Each candidate answer is judged under three authorship frames: self-authored, other-authored, and neutral. We further cross these frames with three verification strategies: direct judgment, brief chain-of-thought evaluation, and rubric-based evaluation. This design separates the model that produced an answer from the model’s belief about authorship, allowing us to distinguish actual self-verification from framing-induced belief effects. We measure verifier accuracy, false-positive and false-negative rates, formatting failures, reasoning-verdict dissociation, and belief-vs-reality gaps between told and true authorship. Pilot results suggest that verification behavior varies substantially by domain, with science questions showing especially high false approvals of incorrect answers. Our findings motivate treating LLM verifiers not as passive correctness oracles, but as context-sensitive agents whose judgments can shift under authorship framing.
 \end{abstract}
 
+\section{Introduction}
+\label{Introduction}
 
+Large language models are increasingly used as judges: they grade benchmark answers, review agent outputs, monitor safety behavior, and provide feedback in self-refinement and multi-agent workflows. These uses often treat the verifier as a neutral proxy for correctness. Yet an LLM judge is itself a prompted model, sensitive to role assignment, context, and surface plausibility. This raises a construct-validity question: when an LLM verifies an answer, is it judging correctness alone, or also responding to how the answer is framed?
 
-\section{Submission of papers to NeurIPS 2026}
+We study one simple framing variable: perceived authorship. In agentic systems, a verifier may be asked to check its own prior answer, another model's answer, or an unattributed answer. These cases are often grouped together as LLM-as-a-judge evaluation, but they may not induce the same behavior. A model told ``you wrote this answer'' may approve, reject, or rationalize differently than the same model judging the same answer under another-author or neutral framing.
 
+We test this with a controlled generator-verifier experiment across math, code, and science tasks. Four models, Qwen2.5-72B-Instruct, DeepSeek-V3, Llama-3.3-70B-Instruct-Turbo, and Mistral-Nemo-Instruct-2407, first generate candidate answers. The same models then verify each answer under three authorship frames: self, other, and neutral. We also vary the verification strategy: direct judgment, brief chain-of-thought evaluation, and rubric-based evaluation. Because the told frame is crossed with the true generator-verifier identity, we can separate belief effects caused by authorship labels from actual self-verification effects.
 
-Please read the instructions below carefully and follow them faithfully.
+We evaluate verifier accuracy, false-positive and false-negative rates, formatting failures, reasoning-verdict dissociation, and belief-vs-reality gaps between told and true authorship. Science is a central stress test: unlike code, where execution can provide grounding, or math, where final answers are often easier to check, science questions can make incorrect answers sound technically plausible. In our pilot, science shows the weakest verification performance and especially high false approvals of incorrect answers.
 
+Our contributions are threefold. First, we introduce a controlled protocol for measuring authorship framing bias in LLM verification. Second, we distinguish told authorship from actual authorship through a belief-vs-reality analysis. Third, we provide a multi-domain study showing that verifier reliability depends strongly on task domain and prompting strategy. Overall, our results suggest that LLM judges should be treated not as passive correctness oracles, but as context-sensitive agents whose judgments can shift under authorship framing.
 
-\subsection{Style}
+% \section{Submission of papers to NeurIPS 2026}
 
 
-Papers to be submitted to NeurIPS 2026 must be prepared according to the
-instructions presented here. Papers may only be up to {\bf nine} pages long, including figures. \textbf{Papers that exceed the page limit will not be reviewed (or in any other way considered) for presentation at the conference.}
-Additional pages \emph{containing acknowledgments, references, checklist, and optional technical appendices} do not count as content pages. 
+% Please read the instructions below carefully and follow them faithfully.
 
 
-The margins in 2026 are the same as those in previous years.
+% % \subsection{Style}
 
 
-Authors are required to use the NeurIPS \LaTeX{} style files obtainable at the NeurIPS website as indicated below. Please make sure you use the current files and not previous versions. Tweaking the style files may be grounds for desk rejection.
+% % Papers to be submitted to NeurIPS 2026 must be prepared according to the
+% % instructions presented here. Papers may only be up to {\bf nine} pages long, including figures. \textbf{Papers that exceed the page limit will not be reviewed (or in any other way considered) for presentation at the conference.}
+% % Additional pages \emph{containing acknowledgments, references, checklist, and optional technical appendices} do not count as content pages. 
 
 
-\subsection{Retrieval of style files}
+% % The margins in 2026 are the same as those in previous years.
 
 
-The style files for NeurIPS and other conference information are available on the website at
-\begin{center}
-  \url{https://neurips.cc}.
-\end{center}
-% The file \verb+neurips_2026.pdf+ contains these instructions and illustrates the various formatting requirements your NeurIPS paper must satisfy.
+% % Authors are required to use the NeurIPS \LaTeX{} style files obtainable at the NeurIPS website as indicated below. Please make sure you use the current files and not previous versions. Tweaking the style files may be grounds for desk rejection.
 
 
-The only supported style file for NeurIPS 2026 is \verb+neurips_2026.sty+, rewritten for \LaTeXe{}. \textbf{Previous style files for \LaTeX{} 2.09,  Microsoft Word, and RTF are no longer supported.}
+% % \subsection{Retrieval of style files}
 
 
-The \LaTeX{} style file contains three optional arguments: 
-\begin{itemize}
-\item \verb+final+, which creates a camera-ready copy, 
-\item \verb+preprint+, which creates a preprint for submission to, e.g., arXiv, \item \verb+nonatbib+, which will not load the \verb+natbib+ package for you in case of package clash.
-\end{itemize}
+% % The style files for NeurIPS and other conference information are available on the website at
+% % \begin{center}
+% %   \url{https://neurips.cc}.
+% % \end{center}
+% % % The file \verb+neurips_2026.pdf+ contains these instructions and illustrates the various formatting requirements your NeurIPS paper must satisfy.
 
 
-\paragraph{Preprint option}
-If you wish to post a preprint of your work online, e.g., on arXiv, using the NeurIPS style, please use the \verb+preprint+ option. This will create a nonanonymized version of your work with the text ``Preprint. Work in progress.'' in the footer. This version may be distributed as you see fit, as long as you do not say which conference it was submitted to. Please \textbf{do not} use the \verb+final+ option, which should \textbf{only} be used for papers accepted to NeurIPS.
+% % The only supported style file for NeurIPS 2026 is \verb+neurips_2026.sty+, rewritten for \LaTeXe{}. \textbf{Previous style files for \LaTeX{} 2.09,  Microsoft Word, and RTF are no longer supported.}
 
 
-At submission time, please omit the \verb+final+ and \verb+preprint+ options. This will anonymize your submission and add line numbers to aid review. Please do \emph{not} refer to these line numbers in your paper as they will be removed during generation of camera-ready copies.
+% % The \LaTeX{} style file contains three optional arguments: 
+% % \begin{itemize}
+% % \item \verb+final+, which creates a camera-ready copy, 
+% % \item \verb+preprint+, which creates a preprint for submission to, e.g., arXiv, \item \verb+nonatbib+, which will not load the \verb+natbib+ package for you in case of package clash.
+% % \end{itemize}
 
 
-The file \verb+neurips_2026.tex+ may be used as a ``shell'' for writing your paper. All you have to do is replace the author, title, abstract, and text of the paper with your own.
+% % \paragraph{Preprint option}
+% % If you wish to post a preprint of your work online, e.g., on arXiv, using the NeurIPS style, please use the \verb+preprint+ option. This will create a nonanonymized version of your work with the text ``Preprint. Work in progress.'' in the footer. This version may be distributed as you see fit, as long as you do not say which conference it was submitted to. Please \textbf{do not} use the \verb+final+ option, which should \textbf{only} be used for papers accepted to NeurIPS.
 
 
-The formatting instructions contained in these style files are summarized in Sections \ref{gen_inst}, \ref{headings}, and \ref{others} below.
+% % At submission time, please omit the \verb+final+ and \verb+preprint+ options. This will anonymize your submission and add line numbers to aid review. Please do \emph{not} refer to these line numbers in your paper as they will be removed during generation of camera-ready copies.
 
 
-\section{General formatting instructions}
-\label{gen_inst}
+% % The file \verb+neurips_2026.tex+ may be used as a ``shell'' for writing your paper. All you have to do is replace the author, title, abstract, and text of the paper with your own.
 
 
-The text must be confined within a rectangle 5.5~inches (33~picas) wide and
-9~inches (54~picas) long. The left margin is 1.5~inch (9~picas).  Use 10~point
-type with a vertical spacing (leading) of 11~points.  Times New Roman is the
-preferred typeface throughout, and will be selected for you by default.
-Paragraphs are separated by \nicefrac{1}{2}~line space (5.5 points), with no
-indentation.
+% % The formatting instructions contained in these style files are summarized in Sections \ref{gen_inst}, \ref{headings}, and \ref{others} below.
 
 
-The paper title should be 17~point, initial caps/lower case, bold, centered
-between two horizontal rules. The top rule should be 4~points thick and the
-bottom rule should be 1~point thick. Allow \nicefrac{1}{4}~inch space above and
-below the title to rules. All pages should start at 1~inch (6~picas) from the
-top of the page.
+% % \section{General formatting instructions}
+% % \label{gen_inst}
 
 
-For the final version, authors' names are set in boldface, and each name is
-centered above the corresponding address. The lead author's name is to be listed
-first (left-most), and the co-authors' names (if different address) are set to
-follow. If there is only one co-author, list both author and co-author side by
-side.
+% % The text must be confined within a rectangle 5.5~inches (33~picas) wide and
+% % 9~inches (54~picas) long. The left margin is 1.5~inch (9~picas).  Use 10~point
+% % type with a vertical spacing (leading) of 11~points.  Times New Roman is the
+% % preferred typeface throughout, and will be selected for you by default.
+% % Paragraphs are separated by \nicefrac{1}{2}~line space (5.5 points), with no
+% % indentation.
 
 
-Please pay special attention to the instructions in Section \ref{others}
-regarding figures, tables, acknowledgments, and references.
+% % The paper title should be 17~point, initial caps/lower case, bold, centered
+% % between two horizontal rules. The top rule should be 4~points thick and the
+% % bottom rule should be 1~point thick. Allow \nicefrac{1}{4}~inch space above and
+% % below the title to rules. All pages should start at 1~inch (6~picas) from the
+% % top of the page.
 
-\section{Headings: first level}
-\label{headings}
 
+% % For the final version, authors' names are set in boldface, and each name is
+% % centered above the corresponding address. The lead author's name is to be listed
+% % first (left-most), and the co-authors' names (if different address) are set to
+% % follow. If there is only one co-author, list both author and co-author side by
+% % side.
 
-All headings should be lower case (except for first word and proper nouns),
-flush left, and bold.
 
+% % Please pay special attention to the instructions in Section \ref{others}
+% % regarding figures, tables, acknowledgments, and references.
 
-First-level headings should be in 12-point type.
+% % \section{Headings: first level}
+% % \label{headings}
 
 
-\subsection{Headings: second level}
+% % All headings should be lower case (except for first word and proper nouns),
+% % flush left, and bold.
 
 
-Second-level headings should be in 10-point type.
+% % First-level headings should be in 12-point type.
 
 
-\subsubsection{Headings: third level}
+% % \subsection{Headings: second level}
 
 
-Third-level headings should be in 10-point type.
+% % Second-level headings should be in 10-point type.
 
 
-\paragraph{Paragraphs}
+% % \subsubsection{Headings: third level}
 
 
-There is also a \verb+\paragraph+ command available, which sets the heading in
-bold, flush left, and inline with the text, with the heading followed by 1\,em
-of space.
+% % Third-level headings should be in 10-point type.
 
 
-\section{Citations, figures, tables, references}
-\label{others}
+% % \paragraph{Paragraphs}
 
 
-These instructions apply to everyone.
+% % There is also a \verb+\paragraph+ command available, which sets the heading in
+% % bold, flush left, and inline with the text, with the heading followed by 1\,em
+% % of space.
 
 
-\subsection{Citations within the text}
+% % \section{Citations, figures, tables, references}
+% % \label{others}
 
 
-The \verb+natbib+ package will be loaded for you by default.  Citations may be
-author/year or numeric, as long as you maintain internal consistency.  As to the
-format of the references themselves, any style is acceptable as long as it is
-used consistently.
+% % These instructions apply to everyone.
 
 
-The documentation for \verb+natbib+ may be found at
-\begin{center}
-  \url{http://mirrors.ctan.org/macros/latex/contrib/natbib/natnotes.pdf}
-\end{center}
-Of note is the command \verb+\citet+, which produces citations appropriate for
-use in inline text.  For example,
-\begin{verbatim}
-   \citet{hasselmo} investigated\dots
-\end{verbatim}
-produces
-\begin{quote}
-  Hasselmo, et al.\ (1995) investigated\dots
-\end{quote}
+% % \subsection{Citations within the text}
 
 
-If you wish to load the \verb+natbib+ package with options, you may add the
-following before loading the \verb+neurips_2026+ package:
-\begin{verbatim}
-   \PassOptionsToPackage{options}{natbib}
-\end{verbatim}
+% % The \verb+natbib+ package will be loaded for you by default.  Citations may be
+% % author/year or numeric, as long as you maintain internal consistency.  As to the
+% % format of the references themselves, any style is acceptable as long as it is
+% % used consistently.
 
 
-If \verb+natbib+ clashes with another package you load, you can add the optional
-argument \verb+nonatbib+ when loading the style file:
-\begin{verbatim}
-   \usepackage[nonatbib]{neurips_2026}
-\end{verbatim}
+% % The documentation for \verb+natbib+ may be found at
+% % \begin{center}
+% %   \url{http://mirrors.ctan.org/macros/latex/contrib/natbib/natnotes.pdf}
+% % \end{center}
+% % Of note is the command \verb+\citet+, which produces citations appropriate for
+% % use in inline text.  For example,
+% % \begin{verbatim}
+% %    \citet{hasselmo} investigated\dots
+% % \end{verbatim}
+% % produces
+% % \begin{quote}
+% %   Hasselmo, et al.\ (1995) investigated\dots
+% % \end{quote}
 
 
-As submission is double blind, refer to your own published work in the third
-person. That is, use ``In the previous work of Jones et al.\ [4],'' not ``In our
-previous work [4].'' If you cite your other papers that are not widely available
-(e.g., a journal paper under review), use anonymous author names in the
-citation, e.g., an author of the form ``A.\ Anonymous'' and include a copy of the anonymized paper in the supplementary material.
+% % If you wish to load the \verb+natbib+ package with options, you may add the
+% % following before loading the \verb+neurips_2026+ package:
+% % \begin{verbatim}
+% %    \PassOptionsToPackage{options}{natbib}
+% % \end{verbatim}
 
 
-\subsection{Footnotes}
+% % If \verb+natbib+ clashes with another package you load, you can add the optional
+% % argument \verb+nonatbib+ when loading the style file:
+% % \begin{verbatim}
+% %    \usepackage[nonatbib]{neurips_2026}
+% % \end{verbatim}
 
 
-Footnotes should be used sparingly.  If you do require a footnote, indicate
-footnotes with a number\footnote{Sample of the first footnote.} in the
-text. Place the footnotes at the bottom of the page on which they appear.
-Precede the footnote with a horizontal rule of 2~inches (12~picas).
+% % As submission is double blind, refer to your own published work in the third
+% % person. That is, use ``In the previous work of Jones et al.\ [4],'' not ``In our
+% % previous work [4].'' If you cite your other papers that are not widely available
+% % (e.g., a journal paper under review), use anonymous author names in the
+% % citation, e.g., an author of the form ``A.\ Anonymous'' and include a copy of the anonymized paper in the supplementary material.
 
 
-Note that footnotes are properly typeset \emph{after} punctuation
-marks.\footnote{As in this example.}
+% % \subsection{Footnotes}
 
 
-\subsection{Figures}
+% % Footnotes should be used sparingly.  If you do require a footnote, indicate
+% % footnotes with a number\footnote{Sample of the first footnote.} in the
+% % text. Place the footnotes at the bottom of the page on which they appear.
+% % Precede the footnote with a horizontal rule of 2~inches (12~picas).
 
 
-\begin{figure}
-  \centering
-  \fbox{\rule[-.5cm]{0cm}{4cm} \rule[-.5cm]{4cm}{0cm}}
-  \caption{Sample figure caption. Explain what the figure shows and add a key take-away message to the caption.}
-\end{figure}
+% % Note that footnotes are properly typeset \emph{after} punctuation
+% % marks.\footnote{As in this example.}
 
 
-All artwork must be neat, clean, and legible. Lines should be dark enough for
- reproduction purposes. The figure number and caption always appear after the
-figure. Place one line space before the figure caption and one line space after
-the figure. The figure caption should be lower case (except for the first word and proper nouns); figures are numbered consecutively.
+% % \subsection{Figures}
 
 
-You may use color figures.  However, it is best for the figure captions and the
-paper body to be legible if the paper is printed in either black/white or in
-color.
+% % \begin{figure}
+% %   \centering
+% %   \fbox{\rule[-.5cm]{0cm}{4cm} \rule[-.5cm]{4cm}{0cm}}
+% %   \caption{Sample figure caption. Explain what the figure shows and add a key take-away message to the caption.}
+% % \end{figure}
 
 
-\subsection{Tables}
+% % All artwork must be neat, clean, and legible. Lines should be dark enough for
+% %  reproduction purposes. The figure number and caption always appear after the
+% % figure. Place one line space before the figure caption and one line space after
+% % the figure. The figure caption should be lower case (except for the first word and proper nouns); figures are numbered consecutively.
 
 
-All tables must be centered, neat, clean, and legible.  The table number and
-title always appear before the table.  See Table~\ref{sample-table}.
+% % You may use color figures.  However, it is best for the figure captions and the
+% % paper body to be legible if the paper is printed in either black/white or in
+% % color.
 
 
-Place one line space before the table title, one line space after the
-table title, and one line space after the table. The table title must
-be lower case (except for the first word and proper nouns); tables are
-numbered consecutively.
+% % \subsection{Tables}
 
 
-Note that publication-quality tables \emph{do not contain vertical rules}. We
-strongly suggest the use of the \verb+booktabs+ package, which allows for
-typesetting high-quality, professional tables:
-\begin{center}
-  \url{https://www.ctan.org/pkg/booktabs}
-\end{center}
-This package was used to typeset Table~\ref{sample-table}.
+% % All tables must be centered, neat, clean, and legible.  The table number and
+% % title always appear before the table.  See Table~\ref{sample-table}.
 
 
-\begin{table}
-  \caption{Sample table caption. Explain what the table shows and add a key take-away message to the caption.}
-  \label{sample-table}
-  \centering
-  \begin{tabular}{lll}
-    \toprule
-    \multicolumn{2}{c}{Part}                   \\
-    \cmidrule(r){1-2}
-    Name     & Description     & Size ($\mu$m) \\
-    \midrule
-    Dendrite & Input terminal  & $\approx$100     \\
-    Axon     & Output terminal & $\approx$10      \\
-    Soma     & Cell body       & up to $10^6$  \\
-    \bottomrule
-  \end{tabular}
-\end{table}
+% % Place one line space before the table title, one line space after the
+% % table title, and one line space after the table. The table title must
+% % be lower case (except for the first word and proper nouns); tables are
+% % numbered consecutively.
 
-\subsection{Math}
-Note that display math in bare TeX commands will not create correct line numbers for submission. Please use LaTeX (or AMSTeX) commands for unnumbered display math. (You really shouldn't be using \$\$ anyway; see \url{https://tex.stackexchange.com/questions/503/why-is-preferable-to} and \url{https://tex.stackexchange.com/questions/40492/what-are-the-differences-between-align-equation-and-displaymath} for more information.)
 
-\subsection{Final instructions}
+% % Note that publication-quality tables \emph{do not contain vertical rules}. We
+% % strongly suggest the use of the \verb+booktabs+ package, which allows for
+% % typesetting high-quality, professional tables:
+% % \begin{center}
+% %   \url{https://www.ctan.org/pkg/booktabs}
+% % \end{center}
+% % This package was used to typeset Table~\ref{sample-table}.
 
-Do not change any aspects of the formatting parameters in the style files.  In
-particular, do not modify the width or length of the rectangle the text should
-fit into, and do not change font sizes. Please note that pages should be
-numbered.
 
+% % \begin{table}
+% %   \caption{Sample table caption. Explain what the table shows and add a key take-away message to the caption.}
+% %   \label{sample-table}
+% %   \centering
+% %   \begin{tabular}{lll}
+% %     \toprule
+% %     \multicolumn{2}{c}{Part}                   \\
+% %     \cmidrule(r){1-2}
+% %     Name     & Description     & Size ($\mu$m) \\
+% %     \midrule
+% %     Dendrite & Input terminal  & $\approx$100     \\
+% %     Axon     & Output terminal & $\approx$10      \\
+% %     Soma     & Cell body       & up to $10^6$  \\
+% %     \bottomrule
+% %   \end{tabular}
+% % \end{table}
 
-\section{Preparing PDF files}
+% % \subsection{Math}
+% % Note that display math in bare TeX commands will not create correct line numbers for submission. Please use LaTeX (or AMSTeX) commands for unnumbered display math. (You really shouldn't be using \$\$ anyway; see \url{https://tex.stackexchange.com/questions/503/why-is-preferable-to} and \url{https://tex.stackexchange.com/questions/40492/what-are-the-differences-between-align-equation-and-displaymath} for more information.)
 
+% % \subsection{Final instructions}
 
-Please prepare submission files with paper size ``US Letter,'' and not, for
-example, ``A4.''
+% % Do not change any aspects of the formatting parameters in the style files.  In
+% % particular, do not modify the width or length of the rectangle the text should
+% % fit into, and do not change font sizes. Please note that pages should be
+% % numbered.
 
 
-Fonts were the main cause of problems in the past years. Your PDF file must only
-contain Type 1 or Embedded TrueType fonts. Here are a few instructions to
-achieve this.
+% % \section{Preparing PDF files}
 
 
-\begin{itemize}
+% % Please prepare submission files with paper size ``US Letter,'' and not, for
+% % example, ``A4.''
 
 
-\item You should directly generate PDF files using \verb+pdflatex+.
+% % Fonts were the main cause of problems in the past years. Your PDF file must only
+% % contain Type 1 or Embedded TrueType fonts. Here are a few instructions to
+% % achieve this.
 
 
-\item You can check which fonts a PDF files uses.  In Acrobat Reader, select the
-  menu Files$>$Document Properties$>$Fonts and select Show All Fonts. You can
-  also use the program \verb+pdffonts+ which comes with \verb+xpdf+ and is
-  available out-of-the-box on most Linux machines.
+% % \begin{itemize}
 
 
-\item \verb+xfig+ ``patterned'' shapes are implemented with bitmap fonts.  Use
-  "solid" shapes instead.
+% % \item You should directly generate PDF files using \verb+pdflatex+.
 
 
-\item The \verb+\bbold+ package almost always uses bitmap fonts.  You should use
-  the equivalent AMS Fonts:
-\begin{verbatim}
-   \usepackage{amsfonts}
-\end{verbatim}
-followed by, e.g., \verb+\mathbb{R}+, \verb+\mathbb{N}+, or \verb+\mathbb{C}+
-for $\mathbb{R}$, $\mathbb{N}$ or $\mathbb{C}$.  You can also use the following
-workaround for reals, natural and complex:
-\begin{verbatim}
-   \newcommand{\RR}{I\!\!R} %real numbers
-   \newcommand{\Nat}{I\!\!N} %natural numbers
-   \newcommand{\CC}{I\!\!\!\!C} %complex numbers
-\end{verbatim}
-Note that \verb+amsfonts+ is automatically loaded by the \verb+amssymb+ package.
+% % \item You can check which fonts a PDF files uses.  In Acrobat Reader, select the
+% %   menu Files$>$Document Properties$>$Fonts and select Show All Fonts. You can
+% %   also use the program \verb+pdffonts+ which comes with \verb+xpdf+ and is
+% %   available out-of-the-box on most Linux machines.
 
 
-\end{itemize}
+% % \item \verb+xfig+ ``patterned'' shapes are implemented with bitmap fonts.  Use
+% %   "solid" shapes instead.
 
 
-If your file contains type 3 fonts or non embedded TrueType fonts, we will ask
-you to fix it.
+% % \item The \verb+\bbold+ package almost always uses bitmap fonts.  You should use
+% %   the equivalent AMS Fonts:
+% % \begin{verbatim}
+% %    \usepackage{amsfonts}
+% % \end{verbatim}
+% % followed by, e.g., \verb+\mathbb{R}+, \verb+\mathbb{N}+, or \verb+\mathbb{C}+
+% % for $\mathbb{R}$, $\mathbb{N}$ or $\mathbb{C}$.  You can also use the following
+% % workaround for reals, natural and complex:
+% % \begin{verbatim}
+% %    \newcommand{\RR}{I\!\!R} %real numbers
+% %    \newcommand{\Nat}{I\!\!N} %natural numbers
+% %    \newcommand{\CC}{I\!\!\!\!C} %complex numbers
+% % \end{verbatim}
+% % Note that \verb+amsfonts+ is automatically loaded by the \verb+amssymb+ package.
 
 
-\subsection{Margins in \LaTeX{}}
+% % \end{itemize}
 
 
-Most of the margin problems come from figures positioned by hand using
-\verb+\special+ or other commands. We suggest using the command
-\verb+\includegraphics+ from the \verb+graphicx+ package. Always specify the
-figure width as a multiple of the line width as in the example below:
-\begin{verbatim}
-   \usepackage[pdftex]{graphicx} ...
-   \includegraphics[width=0.8\linewidth]{myfile.pdf}
-\end{verbatim}
-See Section 4.4 in the graphics bundle documentation
-(\url{http://mirrors.ctan.org/macros/latex/required/graphics/grfguide.pdf})
+% % If your file contains type 3 fonts or non embedded TrueType fonts, we will ask
+% % you to fix it.
 
 
-A number of width problems arise when \LaTeX{} cannot properly hyphenate a
-line. Please give LaTeX hyphenation hints using the \verb+\-+ command when
-necessary.
+% % \subsection{Margins in \LaTeX{}}
 
-\begin{ack}
-Use unnumbered first level headings for the acknowledgments. All acknowledgments
-go at the end of the paper before the list of references. Moreover, you are required to declare
-funding (financial activities supporting the submitted work) and competing interests (related financial activities outside the submitted work).
-More information about this disclosure can be found at: \url{https://neurips.cc/Conferences/2026/PaperInformation/FundingDisclosure}.
 
+% % Most of the margin problems come from figures positioned by hand using
+% % \verb+\special+ or other commands. We suggest using the command
+% % \verb+\includegraphics+ from the \verb+graphicx+ package. Always specify the
+% % figure width as a multiple of the line width as in the example below:
+% % \begin{verbatim}
+% %    \usepackage[pdftex]{graphicx} ...
+% %    \includegraphics[width=0.8\linewidth]{myfile.pdf}
+% % \end{verbatim}
+% % See Section 4.4 in the graphics bundle documentation
+% % (\url{http://mirrors.ctan.org/macros/latex/required/graphics/grfguide.pdf})
 
-Do {\bf not} include this section in the anonymized submission, only in the final paper. You can use the \texttt{ack} environment provided in the style file to automatically hide this section in the anonymized submission.
-\end{ack}
+
+% % A number of width problems arise when \LaTeX{} cannot properly hyphenate a
+% % line. Please give LaTeX hyphenation hints using the \verb+\-+ command when
+% % necessary.
+
+% % \begin{ack}
+% % Use unnumbered first level headings for the acknowledgments. All acknowledgments
+% % go at the end of the paper before the list of references. Moreover, you are required to declare
+% % funding (financial activities supporting the submitted work) and competing interests (related financial activities outside the submitted work).
+% % More information about this disclosure can be found at: \url{https://neurips.cc/Conferences/2026/PaperInformation/FundingDisclosure}.
+
+
+% % Do {\bf not} include this section in the anonymized submission, only in the final paper. You can use the \texttt{ack} environment provided in the style file to automatically hide this section in the anonymized submission.
+% % \end{ack}
 
 \section*{References}
 
