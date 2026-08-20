@@ -87,7 +87,33 @@ def _math_values_equal(a, b, tol=1e-6):
     try:
         return abs(float(a.replace(',', '')) - float(b.replace(',', ''))) < tol
     except ValueError:
-        return a == b
+        # LaTeX answers differ only by spacing: "25 + 2\\sqrt{159}" vs "25+2\\sqrt{159}"
+        return re.sub(r'\s+', '', a) == re.sub(r'\s+', '', b)
+
+def _extract_boxed(text):
+    """
+    Contents of every \\boxed{...}, brace-matched.
+
+    A non-greedy regex stops at the first '}', which truncates nested LaTeX:
+    \\boxed{25 + 2\\sqrt{159}} became "25 + 2\\sqrt{159". That corrupted the ground
+    truth itself for any answer containing braces.
+    """
+    out, i, tag = [], 0, r'\boxed{'
+    while True:
+        i = text.find(tag, i)
+        if i == -1:
+            return out
+        j = start = i + len(tag)
+        depth = 1
+        while j < len(text) and depth:
+            if text[j] == '{':
+                depth += 1
+            elif text[j] == '}':
+                depth -= 1
+            j += 1
+        if depth == 0:
+            out.append(text[start:j - 1])
+        i = j
 
 # A value token: integer, decimal, or simple fraction. Used to pull an answer out of
 # a phrase like ", x = 3." or ": 42".
@@ -166,14 +192,14 @@ def grade_math(candidate_text, ground_truth):
     if not candidate_text:
         return False
 
-    gt_match = re.search(r'\\boxed\{(.*?)\}', ground_truth)
-    gt_val = gt_match.group(1).strip() if gt_match else ground_truth.strip()
+    gt_boxed = _extract_boxed(ground_truth)
+    gt_val = gt_boxed[-1].strip() if gt_boxed else ground_truth.strip()
 
     tagged = re.findall(r'<answer>(.*?)</answer>', candidate_text, re.DOTALL | re.IGNORECASE)
     if tagged:
         return _answer_matches(tagged[-1], gt_val)
 
-    boxed = re.findall(r'\\boxed\{(.*?)\}', candidate_text)
+    boxed = _extract_boxed(candidate_text)
     if boxed:
         return _answer_matches(boxed[-1], gt_val)
 
