@@ -5,9 +5,9 @@
 ## Highest Accuracy by Domain
 ![Accuracy Plot](../plots/pilot_accuracy_by_domain.png)
 
-- **Code**: mistral (Frame: neutral, Strategy: direct) achieved **100.0%** accuracy.
-- **Math**: deepseek (Frame: self, Strategy: cot) achieved **97.5%** accuracy.
-- **Science**: deepseek (Frame: self, Strategy: cot) achieved **75.0%** accuracy.
+- **Code**: mistral (Frame: neutral, Strategy: direct) achieved **100.0%** accuracy (**100.0% Adjusted**).
+- **Math**: deepseek (Frame: self, Strategy: cot) achieved **97.5%** accuracy (**97.5% Adjusted**).
+- **Science**: deepseek (Frame: self, Strategy: cot) achieved **75.0%** accuracy (**75.0% Adjusted**).
 
 ## Model Preferences by Domain (Best Configurations)
 ### Code
@@ -26,7 +26,7 @@
 - **mistral**: Prefers **neutral** frame & **rubric** strategy (**62.5%**)
 - **qwen**: Prefers **self** frame & **cot** strategy (**71.8%**)
 
-## Strategy Performance per Model
+## Strategy Performance per Model (Raw Accuracy)
 | Model | cot | direct | rubric |
 |-------|---|---|---|
 | **deepseek** | 76.8% | 80.0% | 78.0% |
@@ -34,7 +34,40 @@
 | **mistral** | 74.9% | 84.2% | 74.7% |
 | **qwen** | 78.2% | 83.1% | 79.2% |
 
-## 1. Comprehensive Accuracy Breakdown
+## Strategy Performance per Model (Adjusted Accuracy)
+| Model | cot | direct | rubric |
+|-------|---|---|---|
+| **deepseek** | 76.8% | 80.0% | 78.0% |
+| **llama** | 82.2% | 74.2% | 77.5% |
+| **mistral** | 74.9% | 84.2% | 74.7% |
+| **qwen** | 78.2% | 83.1% | 79.2% |
+
+## 1. Comprehensive Accuracy Breakdown (Raw)
+### Overall Average Across Everything
+- **Overall**: 78.6%
+### By Domain
+- **Code**: 78.1%
+- **Math**: 93.5%
+- **Science**: 64.1%
+### By Strategy
+- **cot**: 78.0%
+- **direct**: 80.3%
+- **rubric**: 77.3%
+### By Ownership Frame
+- **neutral**: 77.9%
+- **other**: 77.9%
+- **self**: 80.0%
+### By Model
+- **deepseek**: 78.2%
+- **llama**: 78.0%
+- **mistral**: 77.9%
+- **qwen**: 80.1%
+### Top 3 Best Ownership + Strategy Combos
+- **self + direct**: 81.5%
+- **self + cot**: 79.8%
+- **neutral + direct**: 79.8%
+
+## 1b. Comprehensive Accuracy Breakdown (Adjusted)
 ### Overall Average Across Everything
 - **Overall**: 78.6%
 ### By Domain
@@ -216,7 +249,7 @@ Out of 78 hallucinated verifications:
 
 Read this as 2x2 per verifier: (told self / actually self) vs (told self / actually other) vs (told other / actually self) vs (told other / actually other). A gap between the first two rows (same actual authorship, different label) isolates the pure *belief* effect. A gap between rows 1 and 3 (same label, different truth) isolates the pure *reality* effect. Full data: `belief_vs_reality.csv`.
 
-## 7. Confusion Matrices (Visuals & Raw Data)
+## 9. Confusion Matrices (Visuals & Raw Data)
 ### deepseek
 **True Positives:** 598 | **False Positives:** 198 | **True Negatives:** 242 | **False Negatives:** 35
 

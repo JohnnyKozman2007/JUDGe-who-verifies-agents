@@ -379,10 +379,10 @@ def write_behavior_breakdown(f, title, df, group_col=None):
             conf = agg_b['tp'] / max(1, agg_b['fn'] + agg_b['tp'])
             f.write(f"- **{g}** -> Caught: {caught*100:.1f}% | Passed: {passed*100:.1f}% | Introduced: {intro*100:.1f}% | Confirmed: {conf*100:.1f}%\n")
 
-def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=None):
+def generate_reports_and_plots(df, args, fuzz_errors_removed):
     # Determine prefix based on mode (pilot/actual). 
     mode = args.mode
-    prefix = "pilot_" if mode == "pilot" else "actual_"
+    prefix = "pilot_" if mode == "pilot" else ""
     
     csv_path = os.path.join(args.out_dir, f'{prefix}results_granular.csv')
     # If CSV already exists or plot directory has files, ask once

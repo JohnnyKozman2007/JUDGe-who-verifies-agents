@@ -122,7 +122,7 @@ def run_candidate_code(candidate_text: str, test_code: str, entry_point: Optiona
         full_source += f"\ncheck({entry_point})\n"
     tests_total = _count_assertions(test_code)
 
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False, encoding='utf-8') as f:
         f.write(full_source)
         tmp_name = f.name
 
@@ -131,7 +131,8 @@ def run_candidate_code(candidate_text: str, test_code: str, entry_point: Optiona
             [sys.executable, tmp_name],
             capture_output=True,
             timeout=timeout,
-            text=True
+            text=True,
+            encoding='utf-8'
         )
         ran_successfully = (result.returncode == 0)
         traceback_summary = None if ran_successfully else _extract_traceback_summary(result.stderr)
