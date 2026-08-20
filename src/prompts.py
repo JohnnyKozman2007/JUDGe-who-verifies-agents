@@ -1,6 +1,17 @@
 def get_generation_prompt(domain: str, question: str) -> str:
     if domain == "math":
-        return f"Solve the following math problem. Provide a clear step-by-step solution, and state the final answer clearly.\n\nProblem:\n{question}"
+        return (
+            "Solve the following math problem. Give a clear step-by-step solution.\n\n"
+            "End your response with your final answer inside <answer></answer> tags.\n"
+            "Put ONLY the final value inside the tags: no words, no units, no working, "
+            "and no surrounding text.\n\n"
+            "Rules:\n"
+            "1. Give exactly one <answer> tag, as the last thing in your response.\n"
+            "2. Write a fraction as a/b, for example <answer>3/4</answer>.\n"
+            "3. If the answer is not a single number, write the exact expression.\n"
+            "4. Always give an answer, even if you are uncertain.\n\n"
+            f"Problem:\n{question}"
+        )
     elif domain == "code":
         return (
             "Write a Python function to solve the following task. Provide ONLY the valid Python code, "
@@ -56,7 +67,7 @@ def get_verification_prompt(domain: str, question: str, candidate_answer: str, f
         prompt += "5. Ensure the code strictly adheres to the prompt's constraints.\n"
     elif domain == "math":
         prompt += "3. Verify the mathematical soundness of each calculation step.\n"
-        prompt += "4. Ensure the final answer is derived correctly and matches the expected format.\n"
+        prompt += "4. Ensure the final answer is derived correctly and is stated in a single <answer></answer> tag.\n"
     elif domain == "science":
         prompt += "3. Verify the factual accuracy of the candidate's scientific reasoning.\n"
         prompt += "4. Check whether the candidate selected exactly one option from A, B, C, or D.\n"

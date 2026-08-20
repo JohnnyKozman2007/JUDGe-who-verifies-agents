@@ -10,7 +10,7 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
-from prompts import get_verification_prompt
+from prompts import get_generation_prompt, get_verification_prompt
 
 STRATEGIES = ["direct", "cot", "rubric"]
 QUESTION = "What is 2 + 2?"
@@ -72,6 +72,38 @@ class FramingIsTheOnlyOwnershipDifference(unittest.TestCase):
                 bodies.add(p[p.index("Your task is to verify"):])
             self.assertEqual(len(bodies), 1,
                              f"{s}: frames change more than the ownership sentence")
+
+
+class MathGenerationPromptForcesAnAnswerTag(unittest.TestCase):
+    """grade_math's most reliable path is the <answer> tag; the generator has to produce it."""
+
+    def test_requires_answer_tags(self):
+        p = get_generation_prompt("math", "What is 2 + 2?")
+        self.assertIn("<answer></answer>", p)
+
+    def test_demands_exactly_one_tag(self):
+        self.assertIn("exactly one <answer> tag", get_generation_prompt("math", "Q"))
+
+    def test_verification_criteria_reference_the_same_tag(self):
+        for s in STRATEGIES:
+            self.assertIn("<answer></answer>", math_prompt(s),
+                          f"{s} does not check the format the generator was told to use")
+
+
+class OtherDomainsAreUntouched(unittest.TestCase):
+    """This slice is math only. Changing code or science generation prompts would
+    invalidate their committed data."""
+
+    def test_code_generation_prompt_unchanged(self):
+        self.assertIn("Provide ONLY the valid Python code", get_generation_prompt("code", "Q"))
+
+    def test_science_generation_prompt_still_enforces_final_answer(self):
+        # preflight_check.py asserts this exact string.
+        self.assertIn("FINAL ANSWER", get_generation_prompt("science", "Q"))
+
+    def test_science_and_code_have_no_answer_tag_requirement(self):
+        for d in ["code", "science"]:
+            self.assertNotIn("<answer>", get_generation_prompt(d, "Q"))
 
 
 if __name__ == "__main__":
