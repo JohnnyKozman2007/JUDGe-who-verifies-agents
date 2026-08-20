@@ -107,6 +107,29 @@ class IntermediateValuesMustNotCount(unittest.TestCase):
         self.assertFalse(grade_math(r"We had 5, then doubled to get \boxed{8}", r"\boxed{5}"))
 
 
+class NestedBracesAndSpacing(unittest.TestCase):
+    r"""A non-greedy \boxed{(.*?)} truncates nested LaTeX, corrupting the ground truth
+    itself. 2 of the 10 pilot math items have brace-containing answers."""
+
+    GT = r"Thus the value is $\boxed{25 + 2\sqrt{159}}$, while the latter does not."
+
+    def test_ground_truth_with_nested_braces_is_not_truncated(self):
+        from report import _extract_boxed
+        self.assertEqual(_extract_boxed(self.GT)[-1], r"25 + 2\sqrt{159}")
+
+    def test_correct_nested_latex_answer_matches(self):
+        self.assertTrue(grade_math(r"<answer>25 + 2\sqrt{159}</answer>", self.GT))
+
+    def test_spacing_does_not_change_the_verdict(self):
+        self.assertTrue(grade_math(r"<answer>25+2\sqrt{159}</answer>", self.GT))
+
+    def test_wrong_answer_to_a_nested_latex_question(self):
+        self.assertFalse(grade_math(r"<answer>50</answer>", self.GT))
+
+    def test_candidate_boxed_with_nested_braces(self):
+        self.assertTrue(grade_math(r"Working... \boxed{\frac{3}{4}}", r"\boxed{\frac{3}{4}}"))
+
+
 class DegenerateInputs(unittest.TestCase):
 
     def test_empty_string(self):
