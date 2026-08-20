@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy.stats import chi2_contingency
 from execution_grounding import run_candidate_code
+from science_utils import extract_option_map_from_question, parse_science_candidate_answer
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -18,15 +19,67 @@ def parse_args():
     parser.add_argument("--mode", type=str, choices=["pilot", "actual"], default="pilot", help="Run in pilot or actual mode")
     return parser.parse_args()
 
-def grade_science(candidate_text, ground_truth):
-    if not candidate_text: return False
-    match = re.search(r'(?i)(?:answer|option)\s*(?:is)?\s*[\:\*\_]*\s*\(?([A-D])\)?', candidate_text)
-    if match:
-        return match.group(1).upper() == ground_truth.upper()
-    matches = re.findall(r'\b([A-D])\b', candidate_text.upper())
-    if matches:
-        return matches[-1] == ground_truth.upper()
-    return False
+def _notes_to_string(notes):
+    if notes is None:
+        return ""
+    if isinstance(notes, list):
+        return ";".join(str(note) for note in notes)
+    return str(notes)
+
+def normalize_bool_verdict(value):
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered == "true":
+            return True
+        if lowered == "false":
+            return False
+    return None
+
+
+def recover_verdict_from_raw_response(raw_response):
+    """
+    Recover is_correct from JSON-like verifier responses that failed strict parsing,
+    commonly because LaTeX backslashes such as \\( or \\kappa are invalid JSON escapes.
+    """
+    if not raw_response:
+        return None
+
+    text = str(raw_response).strip()
+
+    try:
+        parsed = json.loads(text)
+        return normalize_bool_verdict(parsed.get("is_correct"))
+    except Exception:
+        pass
+
+    matches = re.findall(
+        r'["\']?is_correct["\']?\s*[:=]\s*["\']?(true|false)["\']?',
+        text,
+        flags=re.IGNORECASE,
+    )
+
+    if not matches:
+        return None
+
+    unique = {match.lower() for match in matches}
+    if len(unique) > 1:
+        return None
+
+    return matches[-1].lower() == "true"
+
+def parse_science_for_item(candidate_text, raw_item):
+    option_map = raw_item.get("option_map")
+    if not isinstance(option_map, dict):
+        option_map = extract_option_map_from_question(str(raw_item.get("question", "")))
+    return parse_science_candidate_answer(candidate_text, option_map)
+
+
+def grade_science(candidate_text, raw_item):
+    parsed = parse_science_for_item(candidate_text, raw_item)
+    gt = str(raw_item.get("ground_truth", "")).upper()
+    return parsed["letter"] == gt and not parsed["ambiguous"]
 
 def _math_values_equal(a, b, tol=1e-6):
     """Compare two math answer strings, numerically if possible, else exact (stripped) string match."""
@@ -70,10 +123,11 @@ def grade_code(candidate_text, test_code, entry_point=None):
     return result.ran_successfully
 
 def load_and_grade(args):
+    graded_candidates = {}
+    science_audit_rows = []
     mode = args.mode
     suffix = "_pilot.jsonl" if mode == "pilot" else ".jsonl"
     domains = ["math", "code", "science"]
-    graded_candidates = {}
     
     for domain in domains:
         raw_path = os.path.join(args.raw_dir, f"{domain}{suffix}")
@@ -97,13 +151,30 @@ def load_and_grade(args):
                 
                 for gen_model, cand_text in item.get('candidates', {}).items():
                     if domain == "science":
-                        is_correct = grade_science(cand_text, raw_item['ground_truth'])
+                        parsed_science = parse_science_for_item(cand_text, raw_item)
+                        ground_truth_letter = str(raw_item.get("ground_truth", "")).upper()
+                        is_correct = parsed_science.get("letter") == ground_truth_letter and not parsed_science.get("ambiguous")
+
+                        science_audit_rows.append({
+                            "item_id": item_id,
+                            "generator": gen_model,
+                            "ground_truth_letter": ground_truth_letter,
+                            "ground_truth_text": raw_item.get("correct_answer_text"),
+                            "extracted_letter": parsed_science.get("letter"),
+                            "extracted_option_text": parsed_science.get("option_text"),
+                            "extraction_mode": parsed_science.get("mode"),
+                            "extraction_confidence": parsed_science.get("confidence"),
+                            "ambiguous": int(bool(parsed_science.get("ambiguous"))),
+                            "parsed_successfully": int(parsed_science.get("letter") is not None),
+                            "parse_notes": _notes_to_string(parsed_science.get("notes")),
+                            "is_correct": int(is_correct),
+                        })
                     elif domain == "math":
                         is_correct = grade_math(cand_text, raw_item['ground_truth'])
                     elif domain == "code":
                         is_correct = grade_code(cand_text, raw_item['test'], entry_point=raw_item.get('entry_point'))
                     graded_candidates[(domain, item_id, gen_model)] = is_correct
-    return graded_candidates
+    return graded_candidates, pd.DataFrame(science_audit_rows)
 
 def load_fuzz_results(args):
     mode = args.mode
@@ -155,7 +226,15 @@ def analyze_verifications(args, graded_candidates, fuzz_dict):
                 elif fuzz_verdict in ("REFERENCE_BUG", "NO_DISCREPANCY"):
                     adjusted_cand_is_correct = True
 
-                parsed = v.get('parsed_verdict')
+                original_parsed_verdict = normalize_bool_verdict(v.get('parsed_verdict'))
+                parsed = original_parsed_verdict
+                verdict_recovered_from_raw = False
+
+                if parsed is None:
+                    recovered = recover_verdict_from_raw_response(v.get("raw_response"))
+                    if recovered is not None:
+                        parsed = recovered
+                        verdict_recovered_from_raw = True
                 thinking = v.get('thinking_or_evaluation', '')
                 verbosity = len(thinking) if thinking else 0
                 
@@ -196,6 +275,10 @@ def analyze_verifications(args, graded_candidates, fuzz_dict):
                 # Was the told frame accurate? (only meaningful when frame in {self, other})
                 frame_matches_truth = (frame == actual_source) if frame in ('self', 'other') else None
 
+                candidate_answer_letter = v.get("candidate_answer_letter")
+                candidate_answer_ambiguous = int(domain == "science" and bool(v.get("candidate_answer_ambiguous")))
+                candidate_answer_parsed = int(domain == "science" and candidate_answer_letter is not None)
+                
                 rows.append({
                     'domain': domain,
                     'item_id': item_id,
@@ -208,6 +291,18 @@ def analyze_verifications(args, graded_candidates, fuzz_dict):
                     'candidate_is_correct': cand_is_correct,
                     'adjusted_candidate_is_correct': adjusted_cand_is_correct,
                     'parsed_verdict': parsed,
+                    'original_parsed_verdict': original_parsed_verdict,
+                    'verdict_recovered_from_raw': int(verdict_recovered_from_raw),
+                    'strict_json_parse_fail': int(original_parsed_verdict is None),
+                    "candidate_answer_letter": candidate_answer_letter,
+                    "candidate_answer_text": v.get("candidate_answer_text"),
+                    "candidate_answer_extraction_mode": v.get("candidate_answer_extraction_mode"),
+                    "candidate_answer_extraction_confidence": v.get("candidate_answer_extraction_confidence"),
+                    "candidate_answer_ambiguous": candidate_answer_ambiguous,
+                    "candidate_answer_parsed": candidate_answer_parsed,
+                    "candidate_answer_parse_notes": _notes_to_string(v.get("candidate_answer_parse_notes")),
+                    "prompt_tokens": v.get("prompt_tokens", 0),
+                    "completion_tokens": v.get("completion_tokens", 0),
                     'formatting_fail': int(parsed is None),
                     'tp': int(tp),
                     'fp': int(fp),
@@ -284,10 +379,10 @@ def write_behavior_breakdown(f, title, df, group_col=None):
             conf = agg_b['tp'] / max(1, agg_b['fn'] + agg_b['tp'])
             f.write(f"- **{g}** -> Caught: {caught*100:.1f}% | Passed: {passed*100:.1f}% | Introduced: {intro*100:.1f}% | Confirmed: {conf*100:.1f}%\n")
 
-def generate_reports_and_plots(df, args, fuzz_errors_removed):
+def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=None):
     # Determine prefix based on mode (pilot/actual). 
     mode = args.mode
-    prefix = "pilot_" if mode == "pilot" else ""
+    prefix = "pilot_" if mode == "pilot" else "actual_"
     
     csv_path = os.path.join(args.out_dir, f'{prefix}results_granular.csv')
     # If CSV already exists or plot directory has files, ask once
@@ -301,6 +396,20 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed):
     os.makedirs(args.plot_dir, exist_ok=True)
     
     df.to_csv(csv_path, index=False)
+
+    science_gen_summary = pd.DataFrame()
+    if science_audit_df is not None and not science_audit_df.empty:
+        science_audit_df.to_csv(os.path.join(args.out_dir, f'{prefix}science_generation_audit.csv'), index=False)
+        science_gen_summary = science_audit_df.groupby('generator').agg(
+            Total=('item_id', 'count'),
+            Correct=('is_correct', 'sum'),
+            Parsed=('parsed_successfully', 'sum'),
+            Ambiguous=('ambiguous', 'sum')
+        ).reset_index()
+        science_gen_summary['Accuracy'] = science_gen_summary['Correct'] / science_gen_summary['Total'].clip(lower=1)
+        science_gen_summary['Parse_Rate'] = science_gen_summary['Parsed'] / science_gen_summary['Total'].clip(lower=1)
+        science_gen_summary['Ambiguous_Rate'] = science_gen_summary['Ambiguous'] / science_gen_summary['Total'].clip(lower=1)
+        science_gen_summary.to_csv(os.path.join(args.out_dir, f'{prefix}science_generator_summary.csv'), index=False)
     
     agg = df.groupby(['domain', 'verifier', 'frame', 'strategy']).agg(
         Total=('item_id', 'count'),
@@ -327,6 +436,47 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed):
     behavior_df['Errors_Introduced_Rate'] = agg['FN'] / (agg['FN'] + agg['TP']).replace(0, 1)
     behavior_df['Correct_Confirmed_Rate'] = agg['TP'] / (agg['FN'] + agg['TP']).replace(0, 1)
     behavior_df.to_csv(os.path.join(args.out_dir, f'{prefix}verifier_behavior_rates.csv'), index=False)
+
+    # Domain-specific checks are kept separate from the headline metrics so the
+    # cross-domain report remains balanced while each domain stays auditable.
+    domain_validity_df = agg.groupby('domain').agg(
+        Total=('Total', 'sum'),
+        Formatting_Fails=('Formatting_Fails', 'sum'),
+        Dissociated=('Dissociated', 'sum'),
+        Code_Overrode_Passing_Tests=('Overrode_Passing_Tests', 'sum')
+    ).reset_index()
+    domain_validity_df['Formatting_Failure_Rate'] = domain_validity_df['Formatting_Fails'] / domain_validity_df['Total'].clip(lower=1)
+    domain_validity_df['Dissociation_Rate'] = domain_validity_df['Dissociated'] / domain_validity_df['Total'].clip(lower=1)
+    domain_validity_df['Science_Candidate_Parse_Rate'] = None
+    domain_validity_df['Science_Candidate_Ambiguous_Rate'] = None
+
+    science_df = df[df['domain'] == 'science'].copy()
+    science_diag = pd.DataFrame()
+    if not science_df.empty:
+        science_diag = science_df.groupby(['verifier', 'frame', 'strategy']).agg(
+            Total=('item_id', 'count'),
+            TP=('tp', 'sum'), FP=('fp', 'sum'), TN=('tn', 'sum'), FN=('fn', 'sum'),
+            Formatting_Fails=('formatting_fail', 'sum'),
+            Candidate_Parsed=('candidate_answer_parsed', 'sum'),
+            Candidate_Ambiguous=('candidate_answer_ambiguous', 'sum'),
+            Avg_Latency=('latency', 'mean'),
+            Avg_Verbosity=('verbosity', 'mean'),
+            Dissociated=('dissociated', 'sum')
+        ).reset_index()
+        science_diag['Valid_Total'] = (science_diag['Total'] - science_diag['Formatting_Fails']).clip(lower=1)
+        science_diag['Accuracy'] = (science_diag['TP'] + science_diag['TN']) / science_diag['Valid_Total']
+        science_diag['FPR'] = science_diag['FP'] / (science_diag['FP'] + science_diag['TN']).replace(0, 1)
+        science_diag['FNR'] = science_diag['FN'] / (science_diag['FN'] + science_diag['TP']).replace(0, 1)
+        science_diag['Candidate_Parse_Rate'] = science_diag['Candidate_Parsed'] / science_diag['Total'].clip(lower=1)
+        science_diag['Candidate_Ambiguous_Rate'] = science_diag['Candidate_Ambiguous'] / science_diag['Total'].clip(lower=1)
+        science_diag['Dissociation_Rate'] = science_diag['Dissociated'] / science_diag['Total'].clip(lower=1)
+        science_diag.to_csv(os.path.join(args.out_dir, f'{prefix}science_verifier_diagnostics.csv'), index=False)
+
+        science_mask = domain_validity_df['domain'] == 'science'
+        domain_validity_df.loc[science_mask, 'Science_Candidate_Parse_Rate'] = science_df['candidate_answer_parsed'].mean()
+        domain_validity_df.loc[science_mask, 'Science_Candidate_Ambiguous_Rate'] = science_df['candidate_answer_ambiguous'].mean()
+
+    domain_validity_df.to_csv(os.path.join(args.out_dir, f'{prefix}domain_validity_checks.csv'), index=False)
     
     # Bias and P-Values
     bias_df = agg[agg['frame'].isin(['self', 'other'])]
@@ -500,18 +650,49 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed):
             if pv:
                 f.write(f"- **{row['verifier']}** ({row['domain']}, {row['strategy']}): FPR Bias p={pv['fpr_p']:.4f} | FNR Bias p={pv['fnr_p']:.4f}\n")
 
-        f.write("\n## 7. Test Suite Overrides (Code Domain)\n")
-        f.write("*Instances where the code passed the test suite (ground truth correct), but the verifier LLM overrode that signal and marked it INCORRECT.*\n")
+        f.write("\n## 7. Domain-Specific Validity Checks\n")
+        f.write("*These checks are diagnostic safeguards around domain-specific grading. They support the shared metrics above; they do not replace the common accuracy/FPR/FNR analysis.*\n\n")
+        f.write(f"Full table: `{prefix}domain_validity_checks.csv`.\n\n")
+
+        f.write("### Code: Execution Grounding\n")
+        f.write("*Instances where the code passed the test suite, but the verifier LLM overrode that execution signal and marked it INCORRECT.*\n")
         code_agg = agg[agg['domain'] == 'code']
         if not code_agg.empty:
             override_sum = code_agg['Overrode_Passing_Tests'].sum()
             f.write(f"- **Total Overrides**: {override_sum} out of {code_agg['TP'].sum() + code_agg['FN'].sum()} passing submissions.\n\n")
-            f.write("### By Verifier Model\n")
+            f.write("#### By Verifier Model\n")
             for verifier in sorted(code_agg['verifier'].unique()):
                 v_df = code_agg[code_agg['verifier'] == verifier]
                 f.write(f"- **{verifier}**: {v_df['Overrode_Passing_Tests'].sum()}\n")
         else:
             f.write("*(No code domain data present)*\n")
+
+        f.write("\n### Science: Option Extraction Audit\n")
+        f.write("*Science grading uses the shared correctness metrics above, with an additional parser audit because GPQA answers must map cleanly to one of A-D.*\n")
+        if not science_df.empty:
+            parse_rate = science_df['candidate_answer_parsed'].mean()
+            ambiguous_rate = science_df['candidate_answer_ambiguous'].mean()
+            f.write(f"- **Candidate Parse Rate**: {parse_rate*100:.1f}% of science verification rows had a detected A-D answer.\n")
+            f.write(f"- **Ambiguous Candidate Rate**: {ambiguous_rate*100:.1f}% of science verification rows were marked ambiguous by the parser.\n")
+            if not science_gen_summary.empty:
+                best_gen = science_gen_summary.loc[science_gen_summary['Accuracy'].idxmax()]
+                f.write(f"- **Best Science Generator**: {best_gen['generator']} with {best_gen['Accuracy']*100:.1f}% generation accuracy.\n")
+            if not science_diag.empty:
+                best_cell = science_diag.loc[science_diag['Accuracy'].idxmax()]
+                worst_fp = science_diag.loc[science_diag['FPR'].idxmax()]
+                f.write(f"- **Best Science Verifier Cell**: {best_cell['verifier']} / {best_cell['frame']} / {best_cell['strategy']} at {best_cell['Accuracy']*100:.1f}% accuracy.\n")
+                f.write(f"- **Highest Science False-Approval Cell**: {worst_fp['verifier']} / {worst_fp['frame']} / {worst_fp['strategy']} with {worst_fp['FPR']*100:.1f}% FPR.\n")
+            f.write(f"Full science audit files: `{prefix}science_generation_audit.csv`, `{prefix}science_generator_summary.csv`, `{prefix}science_verifier_diagnostics.csv`.\n")
+        else:
+            f.write("*(No science domain data present)*\n")
+
+        f.write("\n### Math: Answer Matching\n")
+        math_agg = agg[agg['domain'] == 'math']
+        if not math_agg.empty:
+            f.write("- Math candidates are graded by boxed-answer extraction first, then numeric/exact matching. Symbolically equivalent but differently formatted answers remain a limitation to mention in the paper.\n")
+            f.write(f"- **Math Verification Rows**: {int(math_agg['Total'].sum())}\n")
+        else:
+            f.write("*(No math domain data present)*\n")
 
         f.write("\n## 8. Belief vs. Reality (Told Frame vs. Actual Authorship)\n")
         f.write("*Answers Primary Question 1: does TELLING a verifier 'you wrote this' change its accuracy, independent of whether that's true? "
@@ -524,7 +705,7 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed):
         f.write("\nRead this as 2x2 per verifier: (told self / actually self) vs (told self / actually other) vs "
                 "(told other / actually self) vs (told other / actually other). A gap between the first two rows "
                 "(same actual authorship, different label) isolates the pure *belief* effect. A gap between rows 1 and 3 "
-                "(same label, different truth) isolates the pure *reality* effect. Full data: `belief_vs_reality.csv`.\n")
+                f"(same label, different truth) isolates the pure *reality* effect. Full data: `{prefix}belief_vs_reality.csv`.\n")
 
         f.write("\n## 9. Confusion Matrices (Visuals & Raw Data)\n")
         for verifier in sorted(df['verifier'].unique()):
@@ -543,7 +724,7 @@ def main():
     args = parse_args()
         
     print("Grading generated candidates against ground truth...")
-    graded = load_and_grade(args)
+    graded, science_audit_df = load_and_grade(args)
     
     print("Loading fuzzer override results...")
     fuzz_dict = load_fuzz_results(args)
@@ -553,7 +734,7 @@ def main():
     
     if not df.empty:
         print("Generating reports and plots...")
-        generate_reports_and_plots(df, args, fuzz_errors_removed)
+        generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df)
     else:
         print("No verified data found to report on.")
 
