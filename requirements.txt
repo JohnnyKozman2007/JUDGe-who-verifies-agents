@@ -1,12 +1,15 @@
-openai>=1.14.0
-litellm>=1.31.0
-datasets>=2.18.0
-pandas>=2.2.1
-scikit-learn>=1.4.1.post1
-scipy>=1.12.0
-statsmodels>=0.14.1
-matplotlib>=3.8.3
-seaborn>=0.13.2
-python-dotenv>=1.0.1
-tqdm>=4.66.2
-evalplus>=0.2.1
+# Pinned for reproducibility. Every entry below is actually imported by the pipeline.
+# Verified against src/ and preflight_check.py on 2026-08-20.
+
+# API client for all four models (DeepInfra OpenAI-compatible endpoint)
+openai==3.3.1
+python-dotenv==1.2.3
+
+# Dataset loading: competition_math, humanevalplus, gpqa
+datasets==5.0.1
+
+# Analysis and plotting (report.py)
+pandas==3.0.5
+scipy==1.18.0
+matplotlib==3.11.1
+seaborn==0.13.2

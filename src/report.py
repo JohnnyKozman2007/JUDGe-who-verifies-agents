@@ -89,34 +89,127 @@ def _math_values_equal(a, b, tol=1e-6):
     try:
         return abs(float(a.replace(',', '')) - float(b.replace(',', ''))) < tol
     except ValueError:
-        return a == b
+        # LaTeX answers differ only by spacing: "25 + 2\\sqrt{159}" vs "25+2\\sqrt{159}"
+        return re.sub(r'\s+', '', a) == re.sub(r'\s+', '', b)
 
-def grade_math(candidate_text, ground_truth):
-    if not candidate_text: return False
-    gt_match = re.search(r'\\boxed\{(.*?)\}', ground_truth)
-    gt_val = gt_match.group(1).strip() if gt_match else ground_truth.strip()
+def _extract_boxed(text):
+    """
+    Contents of every \\boxed{...}, brace-matched.
 
-    # Prefer the candidate's own boxed answer if present (most reliable signal)
-    cand_box = re.search(r'\\boxed\{(.*?)\}', candidate_text)
-    if cand_box:
-        return _math_values_equal(cand_box.group(1), gt_val)
+    A non-greedy regex stops at the first '}', which truncates nested LaTeX:
+    \\boxed{25 + 2\\sqrt{159}} became "25 + 2\\sqrt{159". That corrupted the ground
+    truth itself for any answer containing braces.
+    """
+    out, i, tag = [], 0, r'\boxed{'
+    while True:
+        i = text.find(tag, i)
+        if i == -1:
+            return out
+        j = start = i + len(tag)
+        depth = 1
+        while j < len(text) and depth:
+            if text[j] == '{':
+                depth += 1
+            elif text[j] == '}':
+                depth -= 1
+            j += 1
+        if depth == 0:
+            out.append(text[start:j - 1])
+        i = j
 
-    # Try numeric comparison using standalone numbers only (word/number-boundary aware,
-    # so ground truth "5" does NOT match inside "15", "-5", "1.5", "25", etc.)
+# A value token: integer, decimal, or simple fraction. Used to pull an answer out of
+# a phrase like ", x = 3." or ": 42".
+_VALUE_TOKEN = r'-?\d+(?:\.\d+)?(?:\s*/\s*-?\d+)?'
+
+# Phrases a solution uses to announce its final answer. The LAST occurrence wins.
+_ANSWER_MARKER = re.compile(
+    r'\b(?:final\s+answer\b|the\s+answer\s+is\b|answer\s*[:=]|therefore\b'
+    r'|thus\b|hence\b|there\s+(?:are|is)\b)',
+    re.IGNORECASE,
+)
+
+# Solutions sometimes state a count in words ("there are three solutions"). Only
+# consulted inside a final-answer region, never across the whole response.
+_WORD_NUMBERS = {
+    "zero": 0, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
+    "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12,
+    "thirteen": 13, "fourteen": 14, "fifteen": 15, "sixteen": 16, "seventeen": 17,
+    "eighteen": 18, "nineteen": 19, "twenty": 20, "thirty": 30, "forty": 40,
+    "fifty": 50, "sixty": 60, "seventy": 70, "eighty": 80, "ninety": 90,
+    "hundred": 100,
+}
+_WORD_NUMBER_RE = re.compile(r'\b(' + '|'.join(_WORD_NUMBERS) + r')\b', re.IGNORECASE)
+
+def _value_tokens(text):
+    tokens = [m.replace(' ', '') for m in re.findall(_VALUE_TOKEN, text)]
+    tokens += [str(_WORD_NUMBERS[w.lower()]) for w in _WORD_NUMBER_RE.findall(text)]
+    return tokens
+
+def _last_value_token(text):
+    matches = re.findall(_VALUE_TOKEN, text)
+    return matches[-1].replace(' ', '') if matches else None
+
+def _final_answer_region(text):
+    """Text following the last final-answer marker, or None if no marker is present."""
+    last = None
+    for m in _ANSWER_MARKER.finditer(text):
+        last = m
+    return text[last.end():] if last else None
+
+def _answer_matches(region, gt_val):
+    """
+    Does this final-answer region state gt_val as its answer?
+
+    Every value token in the region counts, not just the first: a stated answer is
+    often prose ("Final Answer: it would take 50 workers 6 days"). This is issue #3's
+    own suggested fix, restricting the search space to the final-answer region rather
+    than abandoning number extraction.
+    """
+    if region is None:
+        return False
+    region = region.strip()
+    if not region:
+        return False
+    if _math_values_equal(region, gt_val):
+        return True
+    for token in _value_tokens(region):
+        if _math_values_equal(token, gt_val):
+            return True
     try:
-        gt_num = float(gt_val.replace(',', ''))
-        for tok in re.findall(r'(?<![\d.])-?\d+\.?\d*(?![\d.])', candidate_text):
-            try:
-                if abs(float(tok) - gt_num) < 1e-6:
-                    return True
-            except ValueError:
-                continue
+        float(gt_val.replace(',', ''))
         return False
     except ValueError:
-        # Non-numeric ground truth (e.g. "3/4", "x=5") - use word-boundary match,
-        # not raw substring, to avoid partial-token false positives
-        pattern = re.escape(gt_val)
-        return re.search(rf'(?<!\w){pattern}(?!\w)', candidate_text) is not None
+        # Non-numeric ground truth (fractions, expressions): boundary match, but only
+        # inside this region, never across the whole response.
+        return re.search(rf'(?<!\w){re.escape(gt_val)}(?!\w)', region) is not None
+
+def grade_math(candidate_text, ground_truth):
+    """
+    Grade the candidate's FINAL answer only.
+
+    Issue #3: scanning every number in the response graded wrong answers as correct
+    whenever the ground truth happened to appear in the working. Resolution order,
+    most reliable first.
+    """
+    if not candidate_text:
+        return False
+
+    gt_boxed = _extract_boxed(ground_truth)
+    gt_val = gt_boxed[-1].strip() if gt_boxed else ground_truth.strip()
+
+    tagged = re.findall(r'<answer>(.*?)</answer>', candidate_text, re.DOTALL | re.IGNORECASE)
+    if tagged:
+        return _answer_matches(tagged[-1], gt_val)
+
+    boxed = _extract_boxed(candidate_text)
+    if boxed:
+        return _answer_matches(boxed[-1], gt_val)
+
+    region = _final_answer_region(candidate_text)
+    if region is not None:
+        return _answer_matches(region, gt_val)
+
+    return _answer_matches(_last_value_token(candidate_text), gt_val)
 
 def grade_code(candidate_text, test_code, entry_point=None):
     """Reuses run_candidate_code from execution_grounding.py — single source of truth."""
