@@ -18,6 +18,7 @@ def parse_args():
     parser.add_argument("--plot_dir", default="plots", help="Output directory for plots")
     parser.add_argument("--mode", type=str, choices=["pilot", "actual"], default="pilot", help="Run in pilot or actual mode")
     parser.add_argument("--domains", nargs='+', default=["all"], help="Domains to report: code, science, math, or all")
+    parser.add_argument("--overwrite", action="store_true", help="Overwrite existing reports without prompting")
     return parser.parse_args()
 
 def _notes_to_string(notes):
@@ -392,7 +393,7 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
     csv_path = os.path.join(args.out_dir, f'{prefix}results_granular.csv')
     # If CSV already exists or plot directory has files, ask once
     need_prompt = os.path.exists(csv_path) or (os.path.isdir(args.plot_dir) and any(os.scandir(args.plot_dir)))
-    if need_prompt:
+    if need_prompt and not args.overwrite:
         ans = input(f"Report output (CSV and/or plots) already exists. Overwrite all? (y/n): ")
         if ans.lower().strip() != 'y':
             print("Skipping report generation.")
