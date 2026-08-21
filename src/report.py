@@ -17,6 +17,7 @@ def parse_args():
     parser.add_argument("--out_dir", default="reports", help="Output directory for CSV reports")
     parser.add_argument("--plot_dir", default="plots", help="Output directory for plots")
     parser.add_argument("--mode", type=str, choices=["pilot", "actual"], default="pilot", help="Run in pilot or actual mode")
+    parser.add_argument("--domains", nargs='+', default=["all"], help="Domains to report: code, science, math, or all")
     return parser.parse_args()
 
 def _notes_to_string(notes):
@@ -127,7 +128,8 @@ def load_and_grade(args):
     science_audit_rows = []
     mode = args.mode
     suffix = "_pilot.jsonl" if mode == "pilot" else ".jsonl"
-    domains = ["math", "code", "science"]
+    valid_domains = ["math", "code", "science"]
+    domains = valid_domains if "all" in args.domains else [d for d in args.domains if d in valid_domains]
     
     for domain in domains:
         raw_path = os.path.join(args.raw_dir, f"{domain}{suffix}")
@@ -192,7 +194,8 @@ def load_fuzz_results(args):
 def analyze_verifications(args, graded_candidates, fuzz_dict):
     mode = args.mode
     suffix = "_pilot.jsonl" if mode == "pilot" else ".jsonl"
-    domains = ["math", "code", "science"]
+    valid_domains = ["math", "code", "science"]
+    domains = valid_domains if "all" in args.domains else [d for d in args.domains if d in valid_domains]
     rows = []
     fuzz_errors_removed = 0
     
@@ -379,10 +382,12 @@ def write_behavior_breakdown(f, title, df, group_col=None):
             conf = agg_b['tp'] / max(1, agg_b['fn'] + agg_b['tp'])
             f.write(f"- **{g}** -> Caught: {caught*100:.1f}% | Passed: {passed*100:.1f}% | Introduced: {intro*100:.1f}% | Confirmed: {conf*100:.1f}%\n")
 
-def generate_reports_and_plots(df, args, fuzz_errors_removed):
+def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=None):
     # Determine prefix based on mode (pilot/actual). 
     mode = args.mode
-    prefix = "pilot_" if mode == "pilot" else ""
+    valid_domains = ["math", "code", "science"]
+    domain_tag = "all" if "all" in args.domains else "_".join(sorted(set([d for d in args.domains if d in valid_domains])))
+    prefix = f"pilot_{domain_tag}_" if mode == "pilot" else f"actual_{domain_tag}_"
     
     csv_path = os.path.join(args.out_dir, f'{prefix}results_granular.csv')
     # If CSV already exists or plot directory has files, ask once
