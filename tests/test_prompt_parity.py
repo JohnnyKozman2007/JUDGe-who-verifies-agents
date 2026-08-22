@@ -3,6 +3,11 @@ Strategy is an independent variable in this experiment. If direct/cot/rubric dif
 WHAT they ask the verifier to check, an accuracy gap between them cannot be attributed
 to reasoning style. These tests hold the criteria constant so only the communication
 style varies.
+
+Math and code each get their own slice of this suite (CodeXxx mirrors MathXxx / Xxx).
+Every math class has a code counterpart testing the same property; where the property
+itself is domain-specific (answer tags don't exist for code), the code counterpart
+tests the domain-appropriate analog instead of skipping it.
 """
 import os
 import re
@@ -13,6 +18,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(
 from prompts import get_generation_prompt, get_verification_prompt
 
 STRATEGIES = ["direct", "cot", "rubric"]
+
 QUESTION = "What is 2 + 2?"
 CANDIDATE = "2 + 2 = 4. The answer is 4."
 
@@ -22,8 +28,16 @@ SCIENCE_CANDIDATE = "The process uses light energy to produce glucose. FINAL ANS
 def science_prompt(strategy, frame="neutral"):
     return get_verification_prompt("science", SCIENCE_QUESTION, SCIENCE_CANDIDATE, frame, strategy)
 
+CODE_QUESTION = "Write a function that returns the sum of a list of integers."
+CODE_CANDIDATE = "def sum_list(nums):\n    return sum(nums)"
+
 def math_prompt(strategy, frame="neutral"):
     return get_verification_prompt("math", QUESTION, CANDIDATE, frame, strategy)
+
+
+def code_prompt(strategy, frame="neutral"):
+    return get_verification_prompt("code", CODE_QUESTION, CODE_CANDIDATE, frame, strategy)
+
 
 def criteria_block(prompt):
     m = re.search(r'CRITICAL EVALUATION INSTRUCTIONS:\n((?:\d+\. .*\n)+)', prompt)
@@ -51,6 +65,10 @@ class ScienceCriteriaAreIdenticalAcrossStrategies(unittest.TestCase):
             for s in STRATEGIES
         }
         self.assertEqual(len(heads), 1)
+
+# ---------------------------------------------------------------------------
+# Math slice
+# ---------------------------------------------------------------------------
 
 class MathCriteriaAreIdenticalAcrossStrategies(unittest.TestCase):
 
@@ -225,6 +243,92 @@ class MathGenerationPromptForcesAnAnswerTag(unittest.TestCase):
                           f"{s} does not check the format the generator was told to use")
 
 
+# ---------------------------------------------------------------------------
+# Code slice — mirrors the math slice above, one class per class.
+# ---------------------------------------------------------------------------
+
+class CodeCriteriaAreIdenticalAcrossStrategies(unittest.TestCase):
+    """Code counterpart of MathCriteriaAreIdenticalAcrossStrategies. Same property,
+    same reasoning: an accuracy gap between strategies on the code domain can't be
+    attributed to reasoning style unless the criteria are held constant here too."""
+
+    def test_criteria_block_is_byte_identical(self):
+        blocks = {s: criteria_block(code_prompt(s)) for s in STRATEGIES}
+        for s, b in blocks.items():
+            self.assertIsNotNone(b, f"{s} has no criteria block")
+        self.assertEqual(len(set(blocks.values())), 1, f"criteria differ by strategy: {blocks}")
+
+    def test_every_strategy_binds_its_verdict_to_the_criteria(self):
+        # Code's criteria block has 5 numbered lines (dry-run, pitfalls, constraints),
+        # vs. math's 4 — see get_verification_prompt's domain == "code" branch.
+        for s in STRATEGIES:
+            self.assertIn("criteria 1-5", code_prompt(s),
+                          f"{s} never tells the verifier the criteria are the standard")
+
+    def test_strategies_differ_only_after_the_criteria_block(self):
+        heads = {code_prompt(s).split("Apply evaluation")[0].split("Work through")[0].split("Score the candidate")[0]
+                 for s in STRATEGIES}
+        self.assertEqual(len(heads), 1, "strategies diverge before the criteria block ends")
+
+
+class CodeExamplesMustNotAnchorAVerdict(unittest.TestCase):
+    """Code counterpart of ExamplesMustNotAnchorAVerdict — same anchoring risk applies
+    to the code few-shot examples."""
+
+    def test_no_strategy_shows_only_one_label(self):
+        for s in STRATEGIES:
+            p = code_prompt(s)
+            has_true = '"is_correct": true' in p
+            has_false = '"is_correct": false' in p
+            self.assertTrue(has_true and has_false,
+                            f"{s} anchors a single verdict (true={has_true}, false={has_false})")
+
+    def test_no_example_reasoning_asserts_the_candidate_was_correct(self):
+        for s in STRATEGIES:
+            p = code_prompt(s)
+            self.assertNotIn("The candidate correctly", p,
+                             f"{s} example reasoning leans positive")
+
+
+class CodeFramingIsTheOnlyOwnershipDifference(unittest.TestCase):
+    """Code counterpart of FramingIsTheOnlyOwnershipDifference."""
+
+    def test_frames_differ_only_in_the_ownership_sentence(self):
+        for s in STRATEGIES:
+            bodies = set()
+            for frame in ["self", "other", "neutral"]:
+                p = code_prompt(s, frame)
+                bodies.add(p[p.index("Your task is to verify"):])
+            self.assertEqual(len(bodies), 1,
+                             f"{s}: frames change more than the ownership sentence")
+
+
+class CodeGenerationPromptForcesASelfContainedContract(unittest.TestCase):
+    """Code has no <answer> tag (see MathAndScienceGenerationPromptsAreUntouchedByCodeWork
+    below), so it needs its own version of 'the generator's contract must show up in
+    what the verifier checks'. grade_code actually executes the candidate, so the two
+    load-bearing requirements are: (1) the code must be self-contained, imports
+    included, and (2) edge cases must be handled. Both are stated in the generation
+    prompt; the verifier has to check for both, the same way math's verifier has to
+    check for the <answer> tag it demanded."""
+
+    def test_requires_self_contained_imports(self):
+        p = get_generation_prompt("code", "Q")
+        self.assertIn("necessary imports", p)
+
+    def test_demands_edge_cases_are_handled(self):
+        p = get_generation_prompt("code", "Q")
+        self.assertIn("edge cases", p)
+
+    def test_verification_criteria_reference_the_same_contract(self):
+        for s in STRATEGIES:
+            p = code_prompt(s)
+            self.assertIn("missing imports", p,
+                          f"{s} does not check the import requirement the generator was told to meet")
+            self.assertIn("boundary condition", p,
+                          f"{s} does not check the edge-case requirement the generator was told to meet")
+
+
 class OtherDomainsAreUntouched(unittest.TestCase):
     """This slice is math only. Changing code or science generation prompts would
     invalidate their committed data."""
@@ -239,6 +343,22 @@ class OtherDomainsAreUntouched(unittest.TestCase):
     def test_science_and_code_have_no_answer_tag_requirement(self):
         for d in ["code", "science"]:
             self.assertNotIn("<answer>", get_generation_prompt(d, "Q"))
+
+
+class MathAndScienceGenerationPromptsAreUntouchedByCodeWork(unittest.TestCase):
+    """Mirror of OtherDomainsAreUntouched, guarding the opposite direction: this slice
+    adds code coverage. Math/science generation prompts, and the code-only
+    self-contained-code contract, must not have leaked into each other."""
+
+    def test_math_generation_prompt_unchanged(self):
+        self.assertIn("step-by-step solution", get_generation_prompt("math", "Q"))
+
+    def test_science_generation_prompt_unchanged(self):
+        self.assertIn("FINAL ANSWER", get_generation_prompt("science", "Q"))
+
+    def test_math_and_science_have_no_self_contained_code_requirement(self):
+        for d in ["math", "science"]:
+            self.assertNotIn("necessary imports", get_generation_prompt(d, "Q"))
 
 
 if __name__ == "__main__":

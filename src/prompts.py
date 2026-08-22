@@ -85,7 +85,8 @@ def get_verification_prompt(domain: str, question: str, candidate_answer: str, f
             prompt += "Apply evaluation criteria 1-4 above, then give your verdict. Do not write out your reasoning.\n"
             prompt += "Respond ONLY with a JSON object containing a single key 'is_correct' (boolean). Both verdicts are equally acceptable; judge on the criteria alone. Format: {\"is_correct\": true} or {\"is_correct\": false}\n"
         else:
-            prompt += "Provide your verdict directly. Respond ONLY with a JSON object containing a single key 'is_correct' mapping to true or false. Example: {\"is_correct\": true}\n"
+            prompt += "Apply evaluation criteria 1-5 above, then give your verdict. Do not write out your reasoning.\n"
+            prompt += "Respond ONLY with a JSON object containing a single key 'is_correct' (boolean). Both verdicts are equally acceptable; judge on the criteria alone. Format: {\"is_correct\": true} or {\"is_correct\": false}\n"
         prompt += "DO NOT output any other text before or after the JSON."
         
     elif strategy == "cot":
@@ -94,7 +95,7 @@ def get_verification_prompt(domain: str, question: str, candidate_answer: str, f
         elif domain == "science":
             prompt += "Work through evaluation criteria 1-4 above step by step, then give your verdict.\n"
         else:
-            prompt += "Let's think step by step to determine if the answer is correct.\n"
+            prompt += "Work through evaluation criteria 1-5 above step by step, then give your verdict.\n"
             
         prompt += "Keep your step-by-step analysis extremely brief (maximum 3-4 sentences).\n"
         prompt += "You MUST immediately open the JSON object with a '{'. DO NOT output any introductory text or thinking process outside the JSON.\n"
@@ -111,7 +112,7 @@ def get_verification_prompt(domain: str, question: str, candidate_answer: str, f
         elif domain == "science":
             prompt += "Respond with a JSON object containing two keys: 'thinking' (your brief analysis) and 'is_correct' (boolean). Both verdicts are equally acceptable; judge on the criteria alone. Format: {\"thinking\": \"<brief analysis>\", \"is_correct\": true} or {\"thinking\": \"<brief analysis>\", \"is_correct\": false}"
         else:
-            prompt += "Respond with a JSON object containing two keys: 'thinking' (your brief analysis) and 'is_correct' (boolean true or false). Example: {\"thinking\": \"The candidate correctly applied the formula...\", \"is_correct\": true}"
+            prompt += "Respond with a JSON object containing two keys: 'thinking' (your brief analysis) and 'is_correct' (boolean). Both verdicts are equally acceptable; judge on the criteria alone. Format: {\"thinking\": \"<brief analysis>\", \"is_correct\": true} or {\"thinking\": \"<brief analysis>\", \"is_correct\": false}"
         
     elif strategy == "rubric":
         if domain == "math":
@@ -119,7 +120,7 @@ def get_verification_prompt(domain: str, question: str, candidate_answer: str, f
         elif domain == "science":
             prompt += "Score the candidate against evaluation criteria 1-4 above as a rubric, then give your verdict.\n"
         else:
-            prompt += "Evaluate the candidate's answer using the instructions above as your rubric.\n"
+            prompt += "Score the candidate against evaluation criteria 1-5 above as a rubric, then give your verdict.\n"
             
         prompt += "Keep your evaluation extremely brief (maximum 3-4 sentences).\n"
         prompt += "You MUST immediately open the JSON object with a '{'. DO NOT output any introductory text or thinking process outside the JSON.\n"
@@ -136,7 +137,7 @@ def get_verification_prompt(domain: str, question: str, candidate_answer: str, f
         elif domain == "science":
             prompt += "Respond with a JSON object containing two keys: 'thinking' (your brief assessment) and 'is_correct' (boolean). Both verdicts are equally acceptable; judge on the criteria alone. Format: {\"thinking\": \"<brief assessment>\", \"is_correct\": true} or {\"thinking\": \"<brief assessment>\", \"is_correct\": false}"
         else:
-            prompt += "Respond with a JSON object containing two keys: 'thinking' (your brief assessment) and 'is_correct' (boolean true or false). Example: {\"thinking\": \"The candidate correctly...\", \"is_correct\": false}"
+            prompt += "Respond with a JSON object containing two keys: 'thinking' (your brief assessment) and 'is_correct' (boolean). Both verdicts are equally acceptable; judge on the criteria alone. Format: {\"thinking\": \"<brief analysis>\", \"is_correct\": true} or {\"thinking\": \"<brief analysis>\", \"is_correct\": false}"
         
     else:
         raise ValueError(f"Unknown strategy: {strategy}")

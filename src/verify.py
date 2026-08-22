@@ -14,6 +14,7 @@ from science_utils import (
     parse_science_candidate_answer,
     sanitize_json_escapes,
 )
+from code_utils import CodeCleaner
 
 RAW_DATA_DIR = os.path.join("data", "raw")
 GEN_DATA_DIR = os.path.join("data", "generated")
@@ -28,6 +29,9 @@ async def verify_candidate(item, domain, verifier_model, generator_model, candid
     # If verifier_model == generator_model, actual_source = "self", else "other"
     actual_source = "self" if verifier_model == generator_model else "other"
     
+    if domain == "code":
+        candidate_answer = CodeCleaner.extract_code(candidate_answer)
+        
     question = item["question"]
     prompt = get_verification_prompt(domain, question, candidate_answer, frame, strategy)
 

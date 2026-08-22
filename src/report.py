@@ -308,9 +308,10 @@ def analyze_verifications(args, graded_candidates, fuzz_dict):
                     key = (item_id, gen_model, ver_model, frame, strategy)
                     fuzz_verdict = fuzz_dict.get(key)
                 
-                if fuzz_verdict == "ERROR":
+                if fuzz_verdict in ("ERROR", "SKIPPED_PIPELINE_FAIL"):
                     fuzz_errors_removed += 1
-                    continue
+                    # We no longer `continue` here! If the pipeline fails, we fall back to the basic test result.
+                    pass
                     
                 if fuzz_verdict == "BUG_CONFIRMED":
                     adjusted_cand_is_correct = False
@@ -662,7 +663,7 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
         f.write("# Dynamic Executive Summary\n\n")
         f.write(f"**Total Verifications Processed:** {agg['Total'].sum()}\n")
         if fuzz_errors_removed > 0:
-            f.write(f"**Fuzzer Errors Removed:** {fuzz_errors_removed} (These were safely dropped from all metrics)\n\n")
+            f.write(f"**Pipeline Failures Handled:** {fuzz_errors_removed} (These defaulted to basic test suite results rather than dropping rows)\n\n")
         else:
             f.write("\n")
         
