@@ -69,17 +69,21 @@ def get_verification_prompt(domain: str, question: str, candidate_answer: str, f
         prompt += "3. Verify the mathematical soundness of each calculation step.\n"
         prompt += "4. Ensure the final answer is derived correctly and is stated in a single <answer></answer> tag.\n"
     elif domain == "science":
+        # Criteria are evaluative checks only. Nothing here may tell the verifier which way
+        # to rule: a "mark it incorrect if..." clause anchors the verdict exactly the way a
+        # single-label example does, and math's criteria carry no such directive. Science
+        # having one would push its FPR down and FNR up relative to math for prompt reasons,
+        # contaminating the cross-domain comparison.
         prompt += "3. Verify the factual accuracy of the candidate's scientific reasoning.\n"
-        prompt += "4. Check whether the candidate selected exactly one option from A, B, C, or D.\n"
-        prompt += "5. Check whether the selected option is supported by the candidate's reasoning.\n"
-        prompt += "6. If the reasoning is plausible but the final selected option is wrong, missing, or inconsistent, mark it incorrect.\n"
+        prompt += "4. Check whether the candidate stated exactly one final option (A, B, C, or D) in a 'FINAL ANSWER: <letter>' line, and whether that option follows from its reasoning.\n"
     # 4. Strategy & Formatting
     if strategy == "direct":
         if domain == "math":
             prompt += "Apply evaluation criteria 1-4 above, then give your verdict. Do not write out your reasoning.\n"
             prompt += "Respond ONLY with a JSON object containing a single key 'is_correct' (boolean). Both verdicts are equally acceptable; judge on the criteria alone. Format: {\"is_correct\": true} or {\"is_correct\": false}\n"
         elif domain == "science":
-            prompt += "Provide your verdict on this scientific answer directly. Respond ONLY with a JSON object containing a single key 'is_correct' mapping to true or false. Example: {\"is_correct\": true}\n"
+            prompt += "Apply evaluation criteria 1-4 above, then give your verdict. Do not write out your reasoning.\n"
+            prompt += "Respond ONLY with a JSON object containing a single key 'is_correct' (boolean). Both verdicts are equally acceptable; judge on the criteria alone. Format: {\"is_correct\": true} or {\"is_correct\": false}\n"
         else:
             prompt += "Provide your verdict directly. Respond ONLY with a JSON object containing a single key 'is_correct' mapping to true or false. Example: {\"is_correct\": true}\n"
         prompt += "DO NOT output any other text before or after the JSON."
@@ -88,17 +92,24 @@ def get_verification_prompt(domain: str, question: str, candidate_answer: str, f
         if domain == "math":
             prompt += "Work through evaluation criteria 1-4 above step by step, then give your verdict.\n"
         elif domain == "science":
-            prompt += "Let's evaluate the scientific facts step by step to determine if the answer is correct.\n"
+            prompt += "Work through evaluation criteria 1-4 above step by step, then give your verdict.\n"
         else:
             prompt += "Let's think step by step to determine if the answer is correct.\n"
             
         prompt += "Keep your step-by-step analysis extremely brief (maximum 3-4 sentences).\n"
         prompt += "You MUST immediately open the JSON object with a '{'. DO NOT output any introductory text or thinking process outside the JSON.\n"
-        
+
+        if domain == "science":
+            # Ordered by measured failure share: LaTeX math delimiters caused 70.9% of the
+            # observed science JSON parse failures, backslashed Greek letters only 46%.
+            prompt += ("Inside JSON string values, use no backslashes at all. Do not use LaTeX math "
+                       "delimiters \\( \\) \\[ \\] or $...$, and write scientific symbols as plain "
+                       "words (alpha, sigma, kappa, sqrt, times) rather than backslash commands. "
+                       "Write 'a is approximately 0.85', not '\\(a \\approx 0.85\\)'.\n")
         if domain == "math":
             prompt += "Respond with a JSON object containing two keys: 'thinking' (your brief analysis) and 'is_correct' (boolean). Both verdicts are equally acceptable; judge on the criteria alone. Format: {\"thinking\": \"<brief analysis>\", \"is_correct\": true} or {\"thinking\": \"<brief analysis>\", \"is_correct\": false}"
         elif domain == "science":
-            prompt += "Respond with a JSON object containing two keys: 'thinking' (your brief analysis) and 'is_correct' (boolean true or false). Example: {\"thinking\": \"The candidate correctly identified photosynthesis...\", \"is_correct\": true}"
+            prompt += "Respond with a JSON object containing two keys: 'thinking' (your brief analysis) and 'is_correct' (boolean). Both verdicts are equally acceptable; judge on the criteria alone. Format: {\"thinking\": \"<brief analysis>\", \"is_correct\": true} or {\"thinking\": \"<brief analysis>\", \"is_correct\": false}"
         else:
             prompt += "Respond with a JSON object containing two keys: 'thinking' (your brief analysis) and 'is_correct' (boolean true or false). Example: {\"thinking\": \"The candidate correctly applied the formula...\", \"is_correct\": true}"
         
@@ -106,17 +117,24 @@ def get_verification_prompt(domain: str, question: str, candidate_answer: str, f
         if domain == "math":
             prompt += "Score the candidate against evaluation criteria 1-4 above as a rubric, then give your verdict.\n"
         elif domain == "science":
-            prompt += "Evaluate the response using the scientific instructions above as your rubric.\n"
+            prompt += "Score the candidate against evaluation criteria 1-4 above as a rubric, then give your verdict.\n"
         else:
             prompt += "Evaluate the candidate's answer using the instructions above as your rubric.\n"
             
         prompt += "Keep your evaluation extremely brief (maximum 3-4 sentences).\n"
         prompt += "You MUST immediately open the JSON object with a '{'. DO NOT output any introductory text or thinking process outside the JSON.\n"
-        
+
+        if domain == "science":
+            # Ordered by measured failure share: LaTeX math delimiters caused 70.9% of the
+            # observed science JSON parse failures, backslashed Greek letters only 46%.
+            prompt += ("Inside JSON string values, use no backslashes at all. Do not use LaTeX math "
+                       "delimiters \\( \\) \\[ \\] or $...$, and write scientific symbols as plain "
+                       "words (alpha, sigma, kappa, sqrt, times) rather than backslash commands. "
+                       "Write 'a is approximately 0.85', not '\\(a \\approx 0.85\\)'.\n")
         if domain == "math":
             prompt += "Respond with a JSON object containing two keys: 'thinking' (your brief analysis) and 'is_correct' (boolean). Both verdicts are equally acceptable; judge on the criteria alone. Format: {\"thinking\": \"<brief analysis>\", \"is_correct\": true} or {\"thinking\": \"<brief analysis>\", \"is_correct\": false}"
         elif domain == "science":
-            prompt += "Respond with a JSON object containing two keys: 'thinking' (your brief assessment) and 'is_correct' (boolean true or false). Example: {\"thinking\": \"The candidate correctly stated the law of thermodynamics...\", \"is_correct\": false}"
+            prompt += "Respond with a JSON object containing two keys: 'thinking' (your brief assessment) and 'is_correct' (boolean). Both verdicts are equally acceptable; judge on the criteria alone. Format: {\"thinking\": \"<brief assessment>\", \"is_correct\": true} or {\"thinking\": \"<brief assessment>\", \"is_correct\": false}"
         else:
             prompt += "Respond with a JSON object containing two keys: 'thinking' (your brief assessment) and 'is_correct' (boolean true or false). Example: {\"thinking\": \"The candidate correctly...\", \"is_correct\": false}"
         

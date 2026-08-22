@@ -275,10 +275,54 @@ def parse_science_candidate_answer(
     return parsed
 
 
-def grade_science_candidate(candidate_text: Optional[str], raw_item: Dict[str, object]) -> bool:
+def resolve_option_map(raw_item: Dict[str, object]) -> Dict[str, str]:
+    """Prefer the option_map stored at load time; fall back to re-parsing the question text."""
     option_map = raw_item.get("option_map")
     if not isinstance(option_map, dict):
         option_map = extract_option_map_from_question(str(raw_item.get("question", "")))
+    return option_map
 
-    parsed = parse_science_candidate_answer(candidate_text, option_map)
-    return parsed["letter"] == str(raw_item.get("ground_truth", "")).upper()
+
+def parse_science_for_item(candidate_text: Optional[str], raw_item: Dict[str, object]) -> ParsedScienceAnswer:
+    """Single entry point for parsing a science candidate against its own item."""
+    return parse_science_candidate_answer(candidate_text, resolve_option_map(raw_item))
+
+
+def grade_science_candidate(candidate_text: Optional[str], raw_item: Dict[str, object]) -> bool:
+    """
+    Single source of truth for science correctness. An ambiguous parse is always graded
+    wrong: if we cannot tell which option the candidate committed to, we do not get to
+    credit it for landing on the right letter by luck.
+    """
+    parsed = parse_science_for_item(candidate_text, raw_item)
+    return parsed["letter"] == str(raw_item.get("ground_truth", "")).upper() and not parsed["ambiguous"]
+
+
+def sanitize_json_escapes(text: Optional[str]) -> Optional[str]:
+    """
+    Repair LaTeX backslashes that make a verifier response invalid JSON.
+
+    Measured on 474 real science parse failures: 70.9% contained LaTeX math delimiters
+    (\\( \\) \\[ \\]) and 46.0% a backslashed Greek letter. Any backslash that does not
+    begin a valid JSON escape is doubled so it survives as a literal character.
+
+    This is preferred over regexing `is_correct` out of the raw text, because repairing
+    and re-parsing recovers the whole object - including 'thinking', which the regex path
+    drops. Losing 'thinking' zeroes the verbosity metric and makes dissociation
+    uncomputable for exactly the LaTeX-heavy rows, which are concentrated in cot/rubric.
+
+    Valid escape sequences are consumed atomically so the trailing backslash of a correct
+    '\\\\' pair is not re-examined and wrongly doubled. Models mix conventions freely within
+    one response (e.g. '\\( \\\\gamma B \\\\)'), which defeats a naive per-backslash pass.
+
+    Known residual: \\b \\f \\n \\r \\t are *valid* JSON escapes, so '\\beta' still parses
+    as backspace + 'eta'. Measured at 0.20% of parsed rows - left uncorrected because
+    distinguishing an intended tab from '\\theta' needs semantics, not syntax.
+    """
+    if not text:
+        return text
+    return re.sub(
+        r'\\(["\\/bfnrt]|u[0-9a-fA-F]{4})|\\',
+        lambda m: m.group(0) if m.group(1) else '\\\\',
+        text,
+    )
