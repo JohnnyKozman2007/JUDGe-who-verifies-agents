@@ -9,7 +9,11 @@ sys.stdout.reconfigure(encoding='utf-8')
 from models import generate_response, MODELS
 from prompts import get_verification_prompt
 from execution_grounding import run_candidate_code
-from science_utils import extract_option_map_from_question, parse_science_candidate_answer
+from science_utils import (
+    extract_option_map_from_question,
+    parse_science_candidate_answer,
+    sanitize_json_escapes,
+)
 
 RAW_DATA_DIR = os.path.join("data", "raw")
 GEN_DATA_DIR = os.path.join("data", "generated")
@@ -30,30 +34,17 @@ async def verify_candidate(item, domain, verifier_model, generator_model, candid
     candidate_answer_parse = None
 
     if domain == "science":
+        # The parse is recorded on the output row for auditing, but deliberately NOT injected
+        # into the verifier prompt. report.py grades science as
+        # (parsed letter == ground truth AND not ambiguous), so showing the verifier the same
+        # parse made verifier and grader agree by construction on exactly the rows where
+        # extraction failed - inflating measured accuracy where the data is weakest. It also
+        # carried a "mark it incorrect" directive that math's prompt has no counterpart for.
+        # Math receives no such hint either, which keeps the two read-and-judge domains
+        # symmetric; code's execution block differs in kind because it is real external
+        # ground truth, not a regex over the candidate's own text.
         option_map = item.get("option_map") or extract_option_map_from_question(question)
         candidate_answer_parse = parse_science_candidate_answer(candidate_answer, option_map)
-
-        parse_lines = ["[SCIENCE ANSWER PARSE]"]
-
-        if candidate_answer_parse.get("letter"):
-            parse_lines.append(f"Detected final selected option: {candidate_answer_parse['letter']}")
-        else:
-            parse_lines.append("Detected final selected option: NONE")
-
-        if candidate_answer_parse.get("option_text"):
-            parse_lines.append(f"Detected option text: {candidate_answer_parse['option_text']}")
-
-        if candidate_answer_parse.get("confidence"):
-            parse_lines.append(f"Extraction confidence: {candidate_answer_parse['confidence']}")
-
-        if candidate_answer_parse.get("ambiguous"):
-            parse_lines.append("Extraction status: AMBIGUOUS")
-
-        parse_lines.append(
-            "Use this parse as an audit signal. If the candidate's reasoning sounds plausible but its final selected option is wrong, missing, ambiguous, or inconsistent with the reasoning, mark it incorrect."
-        )
-
-        prompt = prompt + "\n\n" + "\n".join(parse_lines)
 
     execution_result = None
     if domain == "code":
@@ -114,6 +105,7 @@ async def verify_candidate(item, domain, verifier_model, generator_model, candid
         latency = res["latency"]
     
     parsed = {}
+    json_sanitized = False
     if response_text:
         try:
             parsed = json.loads(response_text)
@@ -138,7 +130,22 @@ async def verify_candidate(item, domain, verifier_model, generator_model, candid
                         print(f"Failed to parse JSON for {item['item_id']}, Model: {verifier_model}. Response: {response_text}")
             except Exception as e:
                 print(f"Failed to parse JSON for {item['item_id']}, Model: {verifier_model}. Response: {response_text}")
-                
+
+        # 3. Science-only final tier: repair LaTeX backslashes and re-parse. GPQA answers are
+        # notation-dense, so verifiers emit \( \) and \kappa inside JSON strings, which are
+        # invalid escapes. Repairing recovers the whole object rather than just the verdict,
+        # which keeps 'thinking' alive for the verbosity and dissociation metrics.
+        # Scoped to science so math and code parsing behaviour is unchanged.
+        if not parsed and domain == "science":
+            try:
+                parsed = json.loads(sanitize_json_escapes(response_text))
+                json_sanitized = True
+            except Exception:
+                pass
+
+    if not isinstance(parsed, dict):
+        parsed = {}
+
     parsed_verdict = parsed.get("is_correct", None)
 
     # Did the verifier override a clean test pass on logic grounds? This is the specific
@@ -160,6 +167,9 @@ async def verify_candidate(item, domain, verifier_model, generator_model, candid
         "actual_source": actual_source,
         "raw_response": response_text,
         "parsed_verdict": parsed_verdict,
+        # True when strict JSON parsing failed and the escape-repair tier rescued the object.
+        # Keeps the real format-compliance rate visible even though the verdict was recovered.
+        "json_sanitized": json_sanitized,
         "thinking_or_evaluation": parsed.get("thinking") or parsed.get("evaluation") or parsed.get("reason"),
         "candidate_answer_letter": candidate_answer_parse.get("letter") if candidate_answer_parse else None,
         "candidate_answer_text": candidate_answer_parse.get("option_text") if candidate_answer_parse else None,

@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy.stats import chi2_contingency
 from execution_grounding import run_candidate_code
-from science_utils import extract_option_map_from_question, parse_science_candidate_answer
+from science_utils import grade_science_candidate, parse_science_for_item
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -71,17 +71,9 @@ def recover_verdict_from_raw_response(raw_response):
 
     return matches[-1].lower() == "true"
 
-def parse_science_for_item(candidate_text, raw_item):
-    option_map = raw_item.get("option_map")
-    if not isinstance(option_map, dict):
-        option_map = extract_option_map_from_question(str(raw_item.get("question", "")))
-    return parse_science_candidate_answer(candidate_text, option_map)
-
-
-def grade_science(candidate_text, raw_item):
-    parsed = parse_science_for_item(candidate_text, raw_item)
-    gt = str(raw_item.get("ground_truth", "")).upper()
-    return parsed["letter"] == gt and not parsed["ambiguous"]
+# Science parsing and grading live in science_utils.py. They used to be duplicated here and
+# in science_utils, with the two copies disagreeing about whether an ambiguous parse counts
+# as correct - keeping one implementation means that cannot drift again.
 
 def _math_values_equal(a, b, tol=1e-6):
     """Compare two math answer strings, numerically if possible, else exact (stripped) string match."""
@@ -247,9 +239,11 @@ def load_and_grade(args):
                 
                 for gen_model, cand_text in item.get('candidates', {}).items():
                     if domain == "science":
+                        # parse for the audit columns, but take the verdict from the canonical
+                        # grader so the audit CSV can never disagree with the graded labels.
                         parsed_science = parse_science_for_item(cand_text, raw_item)
                         ground_truth_letter = str(raw_item.get("ground_truth", "")).upper()
-                        is_correct = parsed_science.get("letter") == ground_truth_letter and not parsed_science.get("ambiguous")
+                        is_correct = grade_science_candidate(cand_text, raw_item)
 
                         science_audit_rows.append({
                             "item_id": item_id,
@@ -484,8 +478,8 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
     prefix = f"pilot_{domain_tag}_" if mode == "pilot" else f"actual_{domain_tag}_"
     
     # Organize outputs into domain-specific subfolders for clarity
-    out_dir = os.path.join(args.out_dir, mode, args.domain)
-    plot_dir = os.path.join(args.plot_dir, mode, args.domain)
+    out_dir = os.path.join(args.out_dir, mode, domain_tag)
+    plot_dir = os.path.join(args.plot_dir, mode, domain_tag)
     plot_dir_md = plot_dir.replace("\\", "/")
     
     csv_path = os.path.join(out_dir, f'{prefix}results_granular.csv')
