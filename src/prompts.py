@@ -1,17 +1,6 @@
 def get_generation_prompt(domain: str, question: str) -> str:
     if domain == "math":
-        return (
-            "Solve the following math problem. Give a clear step-by-step solution.\n\n"
-            "End your response with your final answer inside <answer></answer> tags.\n"
-            "Put ONLY the final value inside the tags: no words, no units, no working, "
-            "and no surrounding text.\n\n"
-            "Rules:\n"
-            "1. Give exactly one <answer> tag, as the last thing in your response.\n"
-            "2. Write a fraction as a/b, for example <answer>3/4</answer>.\n"
-            "3. If the answer is not a single number, write the exact expression.\n"
-            "4. Always give an answer, even if you are uncertain.\n\n"
-            f"Problem:\n{question}"
-        )
+        return f"Solve the following math problem. Provide a clear step-by-step solution, and state the final answer clearly.\n\nProblem:\n{question}"
     elif domain == "code":
         return (
             "Write a Python function to solve the following task. Provide ONLY the valid Python code, "
@@ -67,7 +56,7 @@ def get_verification_prompt(domain: str, question: str, candidate_answer: str, f
         prompt += "5. Ensure the code strictly adheres to the prompt's constraints.\n"
     elif domain == "math":
         prompt += "3. Verify the mathematical soundness of each calculation step.\n"
-        prompt += "4. Ensure the final answer is derived correctly and is stated in a single <answer></answer> tag.\n"
+        prompt += "4. Ensure the final answer is derived correctly and matches the expected format.\n"
     elif domain == "science":
         prompt += "3. Verify the factual accuracy of the candidate's scientific reasoning.\n"
         prompt += "4. Check whether the candidate selected exactly one option from A, B, C, or D.\n"
@@ -76,8 +65,7 @@ def get_verification_prompt(domain: str, question: str, candidate_answer: str, f
     # 4. Strategy & Formatting
     if strategy == "direct":
         if domain == "math":
-            prompt += "Apply evaluation criteria 1-4 above, then give your verdict. Do not write out your reasoning.\n"
-            prompt += "Respond ONLY with a JSON object containing a single key 'is_correct' (boolean). Both verdicts are equally acceptable; judge on the criteria alone. Format: {\"is_correct\": true} or {\"is_correct\": false}\n"
+            prompt += "Provide your verdict on this mathematical calculation directly. Respond ONLY with a JSON object containing a single key 'is_correct' mapping to true or false. Example: {\"is_correct\": true}\n"
         elif domain == "science":
             prompt += "Provide your verdict on this scientific answer directly. Respond ONLY with a JSON object containing a single key 'is_correct' mapping to true or false. Example: {\"is_correct\": true}\n"
         else:
@@ -86,7 +74,7 @@ def get_verification_prompt(domain: str, question: str, candidate_answer: str, f
         
     elif strategy == "cot":
         if domain == "math":
-            prompt += "Work through evaluation criteria 1-4 above step by step, then give your verdict.\n"
+            prompt += "Let's calculate step by step to determine if the mathematical answer is correct.\n"
         elif domain == "science":
             prompt += "Let's evaluate the scientific facts step by step to determine if the answer is correct.\n"
         else:
@@ -96,7 +84,7 @@ def get_verification_prompt(domain: str, question: str, candidate_answer: str, f
         prompt += "You MUST immediately open the JSON object with a '{'. DO NOT output any introductory text or thinking process outside the JSON.\n"
         
         if domain == "math":
-            prompt += "Respond with a JSON object containing two keys: 'thinking' (your brief analysis) and 'is_correct' (boolean). Both verdicts are equally acceptable; judge on the criteria alone. Format: {\"thinking\": \"<brief analysis>\", \"is_correct\": true} or {\"thinking\": \"<brief analysis>\", \"is_correct\": false}"
+            prompt += "Respond with a JSON object containing two keys: 'thinking' (your brief analysis) and 'is_correct' (boolean true or false). Example: {\"thinking\": \"The candidate correctly applied the quadratic formula...\", \"is_correct\": true}"
         elif domain == "science":
             prompt += "Respond with a JSON object containing two keys: 'thinking' (your brief analysis) and 'is_correct' (boolean true or false). Example: {\"thinking\": \"The candidate correctly identified photosynthesis...\", \"is_correct\": true}"
         else:
@@ -104,7 +92,7 @@ def get_verification_prompt(domain: str, question: str, candidate_answer: str, f
         
     elif strategy == "rubric":
         if domain == "math":
-            prompt += "Score the candidate against evaluation criteria 1-4 above as a rubric, then give your verdict.\n"
+            prompt += "Evaluate the math solution using the calculation instructions above as your rubric.\n"
         elif domain == "science":
             prompt += "Evaluate the response using the scientific instructions above as your rubric.\n"
         else:
@@ -114,7 +102,7 @@ def get_verification_prompt(domain: str, question: str, candidate_answer: str, f
         prompt += "You MUST immediately open the JSON object with a '{'. DO NOT output any introductory text or thinking process outside the JSON.\n"
         
         if domain == "math":
-            prompt += "Respond with a JSON object containing two keys: 'thinking' (your brief analysis) and 'is_correct' (boolean). Both verdicts are equally acceptable; judge on the criteria alone. Format: {\"thinking\": \"<brief analysis>\", \"is_correct\": true} or {\"thinking\": \"<brief analysis>\", \"is_correct\": false}"
+            prompt += "Respond with a JSON object containing two keys: 'thinking' (your brief assessment) and 'is_correct' (boolean true or false). Example: {\"thinking\": \"The candidate correctly derived the final equation...\", \"is_correct\": false}"
         elif domain == "science":
             prompt += "Respond with a JSON object containing two keys: 'thinking' (your brief assessment) and 'is_correct' (boolean true or false). Example: {\"thinking\": \"The candidate correctly stated the law of thermodynamics...\", \"is_correct\": false}"
         else:

@@ -483,7 +483,12 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
     domain_tag = "all" if "all" in args.domains else "_".join(sorted(set([d for d in args.domains if d in valid_domains])))
     prefix = f"pilot_{domain_tag}_" if mode == "pilot" else f"actual_{domain_tag}_"
     
-    csv_path = os.path.join(args.out_dir, f'{prefix}results_granular.csv')
+    # Organize outputs into domain-specific subfolders for clarity
+    out_dir = os.path.join(args.out_dir, mode, args.domain)
+    plot_dir = os.path.join(args.plot_dir, mode, args.domain)
+    plot_dir_md = plot_dir.replace("\\", "/")
+    
+    csv_path = os.path.join(out_dir, f'{prefix}results_granular.csv')
     # If CSV already exists or plot directory has files, ask once
     need_prompt = os.path.exists(csv_path) or (os.path.isdir(args.plot_dir) and any(os.scandir(args.plot_dir)))
     if need_prompt and not args.overwrite:
@@ -491,14 +496,14 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
         if ans.lower().strip() != 'y':
             print("Skipping report generation.")
             return
-    os.makedirs(args.out_dir, exist_ok=True)
-    os.makedirs(args.plot_dir, exist_ok=True)
+    os.makedirs(out_dir, exist_ok=True)
+    os.makedirs(plot_dir, exist_ok=True)
     
     df.to_csv(csv_path, index=False)
 
     science_gen_summary = pd.DataFrame()
     if science_audit_df is not None and not science_audit_df.empty:
-        science_audit_df.to_csv(os.path.join(args.out_dir, f'{prefix}science_generation_audit.csv'), index=False)
+        science_audit_df.to_csv(os.path.join(out_dir, f'{prefix}science_generation_audit.csv'), index=False)
         science_gen_summary = science_audit_df.groupby('generator').agg(
             Total=('item_id', 'count'),
             Correct=('is_correct', 'sum'),
@@ -508,7 +513,7 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
         science_gen_summary['Accuracy'] = science_gen_summary['Correct'] / science_gen_summary['Total'].clip(lower=1)
         science_gen_summary['Parse_Rate'] = science_gen_summary['Parsed'] / science_gen_summary['Total'].clip(lower=1)
         science_gen_summary['Ambiguous_Rate'] = science_gen_summary['Ambiguous'] / science_gen_summary['Total'].clip(lower=1)
-        science_gen_summary.to_csv(os.path.join(args.out_dir, f'{prefix}science_generator_summary.csv'), index=False)
+        science_gen_summary.to_csv(os.path.join(out_dir, f'{prefix}science_generator_summary.csv'), index=False)
     
     agg = df.groupby(['domain', 'verifier', 'frame', 'strategy']).agg(
         Total=('item_id', 'count'),
@@ -534,7 +539,7 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
     behavior_df['Errors_Passed_Rate'] = agg['FP'] / (agg['TN'] + agg['FP']).replace(0, 1)
     behavior_df['Errors_Introduced_Rate'] = agg['FN'] / (agg['FN'] + agg['TP']).replace(0, 1)
     behavior_df['Correct_Confirmed_Rate'] = agg['TP'] / (agg['FN'] + agg['TP']).replace(0, 1)
-    behavior_df.to_csv(os.path.join(args.out_dir, f'{prefix}verifier_behavior_rates.csv'), index=False)
+    behavior_df.to_csv(os.path.join(out_dir, f'{prefix}verifier_behavior_rates.csv'), index=False)
 
     # Domain-specific checks are kept separate from the headline metrics so the
     # cross-domain report remains balanced while each domain stays auditable.
@@ -569,13 +574,13 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
         science_diag['Candidate_Parse_Rate'] = science_diag['Candidate_Parsed'] / science_diag['Total'].clip(lower=1)
         science_diag['Candidate_Ambiguous_Rate'] = science_diag['Candidate_Ambiguous'] / science_diag['Total'].clip(lower=1)
         science_diag['Dissociation_Rate'] = science_diag['Dissociated'] / science_diag['Total'].clip(lower=1)
-        science_diag.to_csv(os.path.join(args.out_dir, f'{prefix}science_verifier_diagnostics.csv'), index=False)
+        science_diag.to_csv(os.path.join(out_dir, f'{prefix}science_verifier_diagnostics.csv'), index=False)
 
         science_mask = domain_validity_df['domain'] == 'science'
         domain_validity_df.loc[science_mask, 'Science_Candidate_Parse_Rate'] = science_df['candidate_answer_parsed'].mean()
         domain_validity_df.loc[science_mask, 'Science_Candidate_Ambiguous_Rate'] = science_df['candidate_answer_ambiguous'].mean()
 
-    domain_validity_df.to_csv(os.path.join(args.out_dir, f'{prefix}domain_validity_checks.csv'), index=False)
+    domain_validity_df.to_csv(os.path.join(out_dir, f'{prefix}domain_validity_checks.csv'), index=False)
     
     # Bias and P-Values
     bias_df = agg[agg['frame'].isin(['self', 'other'])]
@@ -586,7 +591,7 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
     if 'other' in pivot_fnr.columns and 'self' in pivot_fnr.columns:
         pivot_fnr['FNR_Self_Bias'] = pivot_fnr['self'] - pivot_fnr['other']
     bias_merged = pd.merge(pivot_fpr, pivot_fnr, on=['domain', 'verifier', 'strategy'], suffixes=('_FPR', '_FNR'))
-    bias_merged.to_csv(os.path.join(args.out_dir, f'{prefix}bias_metrics.csv'), index=False)
+    bias_merged.to_csv(os.path.join(out_dir, f'{prefix}bias_metrics.csv'), index=False)
     
     # P-values computed PER (verifier, domain, strategy) cell so they actually test the same
     # slice of data as the bias number they're reported next to (previously this was collapsed
@@ -620,7 +625,7 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
     ).reset_index()
     belief_reality['Accuracy'] = (belief_reality['TP'] + belief_reality['TN']) / belief_reality['Valid'].clip(lower=1)
     belief_reality['FPR'] = belief_reality['FP'] / (belief_reality['FP'] + belief_reality['TN']).replace(0, 1)
-    belief_reality.to_csv(os.path.join(args.out_dir, f'{prefix}belief_vs_reality.csv'), index=False)
+    belief_reality.to_csv(os.path.join(out_dir, f'{prefix}belief_vs_reality.csv'), index=False)
 
     sns.set_theme(style="whitegrid")
     
@@ -628,7 +633,7 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
     sns.barplot(data=agg, x='domain', y='Accuracy', hue='verifier', errorbar=None)
     plt.title('Verifier Accuracy by Domain')
     plt.ylim(0, 1.1)
-    plt.savefig(os.path.join(args.plot_dir, f'{prefix}accuracy_by_domain.png'))
+    plt.savefig(os.path.join(plot_dir, f'{prefix}accuracy_by_domain.png'))
     plt.close()
     
     if 'FPR_Self_Bias' in bias_merged.columns:
@@ -637,7 +642,7 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
         plt.title('Self-Preservation Bias (FPR Gap: Self - Other)')
         plt.ylabel('FPR Difference')
         plt.axhline(0, color='black', linestyle='--')
-        plt.savefig(os.path.join(args.plot_dir, f'{prefix}fpr_self_bias.png'))
+        plt.savefig(os.path.join(plot_dir, f'{prefix}fpr_self_bias.png'))
         plt.close()
 
     if 'FNR_Self_Bias' in bias_merged.columns:
@@ -646,7 +651,7 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
         plt.title('Self-Doubt Bias (FNR Gap: Self - Other)')
         plt.ylabel('FNR Difference')
         plt.axhline(0, color='black', linestyle='--')
-        plt.savefig(os.path.join(args.plot_dir, f'{prefix}fnr_self_bias.png'))
+        plt.savefig(os.path.join(plot_dir, f'{prefix}fnr_self_bias.png'))
         plt.close()
 
     for verifier in df['verifier'].unique():
@@ -655,10 +660,10 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
         plt.figure(figsize=(6, 5))
         sns.heatmap(matrix, annot=True, fmt='d', cmap='Blues', xticklabels=['Predicted False', 'Predicted True'], yticklabels=['Actual False', 'Actual True'])
         plt.title(f'Confusion Matrix - {verifier}')
-        plt.savefig(os.path.join(args.plot_dir, f'{prefix}confusion_matrix_{verifier}.png'))
+        plt.savefig(os.path.join(plot_dir, f'{prefix}confusion_matrix_{verifier}.png'))
         plt.close()
 
-    summary_path = os.path.join(args.out_dir, f'{prefix}executive_summary.md')
+    summary_path = os.path.join(out_dir, f'{prefix}executive_summary.md')
     with open(summary_path, 'w', encoding='utf-8') as f:
         f.write("# Dynamic Executive Summary\n\n")
         f.write(f"**Total Verifications Processed:** {agg['Total'].sum()}\n")
@@ -668,7 +673,7 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
             f.write("\n")
         
         f.write("## Highest Accuracy by Domain\n")
-        f.write(f"![Accuracy Plot](../{args.plot_dir}/{prefix}accuracy_by_domain.png)\n\n")
+        f.write(f"![Accuracy Plot](../../../{plot_dir_md}/{prefix}accuracy_by_domain.png)\n\n")
         for domain in sorted(df['domain'].unique()):
             dom_df = agg[agg['domain'] == domain]
             best_row = dom_df.loc[dom_df['Accuracy'].idxmax()]
@@ -725,7 +730,7 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
         f.write("\n## 6. Statistical Bias (Self vs Other)\n")
         f.write("### Top 3 Highest Self-Preservation Biases (FPR Gap)\n")
         f.write("*These models were most likely to falsely approve their own mistakes.*\n")
-        f.write(f"![FPR Bias Plot](../{args.plot_dir}/{prefix}fpr_self_bias.png)\n\n")
+        f.write(f"![FPR Bias Plot](../../../{plot_dir_md}/{prefix}fpr_self_bias.png)\n\n")
         if 'FPR_Self_Bias' in bias_merged.columns:
             top_fpr = bias_merged.sort_values(by='FPR_Self_Bias', ascending=False).head(3)
             for _, row in top_fpr.iterrows():
@@ -733,7 +738,7 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
                 
         f.write("\n### Top 3 Highest Self-Doubt Biases (FNR Gap)\n")
         f.write("*These models were most likely to falsely reject their own correct answers.*\n")
-        f.write(f"![FNR Bias Plot](../{args.plot_dir}/{prefix}fnr_self_bias.png)\n\n")
+        f.write(f"![FNR Bias Plot](../../../{plot_dir_md}/{prefix}fnr_self_bias.png)\n\n")
         if 'FNR_Self_Bias' in bias_merged.columns:
             top_fnr = bias_merged.sort_values(by='FNR_Self_Bias', ascending=False).head(3)
             for _, row in top_fnr.iterrows():
@@ -815,9 +820,9 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
             fn = mod_df['fn'].sum()
             f.write(f"### {verifier}\n")
             f.write(f"**True Positives:** {tp} | **False Positives:** {fp} | **True Negatives:** {tn} | **False Negatives:** {fn}\n\n")
-            f.write(f"![Confusion Matrix {verifier}](../{args.plot_dir}/{prefix}confusion_matrix_{verifier}.png)\n")
+            f.write(f"![Confusion Matrix {verifier}](../../../{plot_dir_md}/{prefix}confusion_matrix_{verifier}.png)\n")
             
-    print(f"Reports successfully generated in {args.out_dir}/ and {args.plot_dir}/")
+    print(f"Reports successfully generated in {out_dir}/ and {plot_dir}/")
 
 def main():
     args = parse_args()
