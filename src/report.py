@@ -89,34 +89,127 @@ def _math_values_equal(a, b, tol=1e-6):
     try:
         return abs(float(a.replace(',', '')) - float(b.replace(',', ''))) < tol
     except ValueError:
-        return a == b
+        # LaTeX answers differ only by spacing: "25 + 2\\sqrt{159}" vs "25+2\\sqrt{159}"
+        return re.sub(r'\s+', '', a) == re.sub(r'\s+', '', b)
 
-def grade_math(candidate_text, ground_truth):
-    if not candidate_text: return False
-    gt_match = re.search(r'\\boxed\{(.*?)\}', ground_truth)
-    gt_val = gt_match.group(1).strip() if gt_match else ground_truth.strip()
+def _extract_boxed(text):
+    """
+    Contents of every \\boxed{...}, brace-matched.
 
-    # Prefer the candidate's own boxed answer if present (most reliable signal)
-    cand_box = re.search(r'\\boxed\{(.*?)\}', candidate_text)
-    if cand_box:
-        return _math_values_equal(cand_box.group(1), gt_val)
+    A non-greedy regex stops at the first '}', which truncates nested LaTeX:
+    \\boxed{25 + 2\\sqrt{159}} became "25 + 2\\sqrt{159". That corrupted the ground
+    truth itself for any answer containing braces.
+    """
+    out, i, tag = [], 0, r'\boxed{'
+    while True:
+        i = text.find(tag, i)
+        if i == -1:
+            return out
+        j = start = i + len(tag)
+        depth = 1
+        while j < len(text) and depth:
+            if text[j] == '{':
+                depth += 1
+            elif text[j] == '}':
+                depth -= 1
+            j += 1
+        if depth == 0:
+            out.append(text[start:j - 1])
+        i = j
 
-    # Try numeric comparison using standalone numbers only (word/number-boundary aware,
-    # so ground truth "5" does NOT match inside "15", "-5", "1.5", "25", etc.)
+# A value token: integer, decimal, or simple fraction. Used to pull an answer out of
+# a phrase like ", x = 3." or ": 42".
+_VALUE_TOKEN = r'-?\d+(?:\.\d+)?(?:\s*/\s*-?\d+)?'
+
+# Phrases a solution uses to announce its final answer. The LAST occurrence wins.
+_ANSWER_MARKER = re.compile(
+    r'\b(?:final\s+answer\b|the\s+answer\s+is\b|answer\s*[:=]|therefore\b'
+    r'|thus\b|hence\b|there\s+(?:are|is)\b)',
+    re.IGNORECASE,
+)
+
+# Solutions sometimes state a count in words ("there are three solutions"). Only
+# consulted inside a final-answer region, never across the whole response.
+_WORD_NUMBERS = {
+    "zero": 0, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
+    "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12,
+    "thirteen": 13, "fourteen": 14, "fifteen": 15, "sixteen": 16, "seventeen": 17,
+    "eighteen": 18, "nineteen": 19, "twenty": 20, "thirty": 30, "forty": 40,
+    "fifty": 50, "sixty": 60, "seventy": 70, "eighty": 80, "ninety": 90,
+    "hundred": 100,
+}
+_WORD_NUMBER_RE = re.compile(r'\b(' + '|'.join(_WORD_NUMBERS) + r')\b', re.IGNORECASE)
+
+def _value_tokens(text):
+    tokens = [m.replace(' ', '') for m in re.findall(_VALUE_TOKEN, text)]
+    tokens += [str(_WORD_NUMBERS[w.lower()]) for w in _WORD_NUMBER_RE.findall(text)]
+    return tokens
+
+def _last_value_token(text):
+    matches = re.findall(_VALUE_TOKEN, text)
+    return matches[-1].replace(' ', '') if matches else None
+
+def _final_answer_region(text):
+    """Text following the last final-answer marker, or None if no marker is present."""
+    last = None
+    for m in _ANSWER_MARKER.finditer(text):
+        last = m
+    return text[last.end():] if last else None
+
+def _answer_matches(region, gt_val):
+    """
+    Does this final-answer region state gt_val as its answer?
+
+    Every value token in the region counts, not just the first: a stated answer is
+    often prose ("Final Answer: it would take 50 workers 6 days"). This is issue #3's
+    own suggested fix, restricting the search space to the final-answer region rather
+    than abandoning number extraction.
+    """
+    if region is None:
+        return False
+    region = region.strip()
+    if not region:
+        return False
+    if _math_values_equal(region, gt_val):
+        return True
+    for token in _value_tokens(region):
+        if _math_values_equal(token, gt_val):
+            return True
     try:
-        gt_num = float(gt_val.replace(',', ''))
-        for tok in re.findall(r'(?<![\d.])-?\d+\.?\d*(?![\d.])', candidate_text):
-            try:
-                if abs(float(tok) - gt_num) < 1e-6:
-                    return True
-            except ValueError:
-                continue
+        float(gt_val.replace(',', ''))
         return False
     except ValueError:
-        # Non-numeric ground truth (e.g. "3/4", "x=5") - use word-boundary match,
-        # not raw substring, to avoid partial-token false positives
-        pattern = re.escape(gt_val)
-        return re.search(rf'(?<!\w){pattern}(?!\w)', candidate_text) is not None
+        # Non-numeric ground truth (fractions, expressions): boundary match, but only
+        # inside this region, never across the whole response.
+        return re.search(rf'(?<!\w){re.escape(gt_val)}(?!\w)', region) is not None
+
+def grade_math(candidate_text, ground_truth):
+    """
+    Grade the candidate's FINAL answer only.
+
+    Issue #3: scanning every number in the response graded wrong answers as correct
+    whenever the ground truth happened to appear in the working. Resolution order,
+    most reliable first.
+    """
+    if not candidate_text:
+        return False
+
+    gt_boxed = _extract_boxed(ground_truth)
+    gt_val = gt_boxed[-1].strip() if gt_boxed else ground_truth.strip()
+
+    tagged = re.findall(r'<answer>(.*?)</answer>', candidate_text, re.DOTALL | re.IGNORECASE)
+    if tagged:
+        return _answer_matches(tagged[-1], gt_val)
+
+    boxed = _extract_boxed(candidate_text)
+    if boxed:
+        return _answer_matches(boxed[-1], gt_val)
+
+    region = _final_answer_region(candidate_text)
+    if region is not None:
+        return _answer_matches(region, gt_val)
+
+    return _answer_matches(_last_value_token(candidate_text), gt_val)
 
 def grade_code(candidate_text, test_code, entry_point=None):
     """Reuses run_candidate_code from execution_grounding.py — single source of truth."""
@@ -390,7 +483,12 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
     domain_tag = "all" if "all" in args.domains else "_".join(sorted(set([d for d in args.domains if d in valid_domains])))
     prefix = f"pilot_{domain_tag}_" if mode == "pilot" else f"actual_{domain_tag}_"
     
-    csv_path = os.path.join(args.out_dir, f'{prefix}results_granular.csv')
+    # Organize outputs into domain-specific subfolders for clarity
+    out_dir = os.path.join(args.out_dir, mode, args.domain)
+    plot_dir = os.path.join(args.plot_dir, mode, args.domain)
+    plot_dir_md = plot_dir.replace("\\", "/")
+    
+    csv_path = os.path.join(out_dir, f'{prefix}results_granular.csv')
     # If CSV already exists or plot directory has files, ask once
     need_prompt = os.path.exists(csv_path) or (os.path.isdir(args.plot_dir) and any(os.scandir(args.plot_dir)))
     if need_prompt and not args.overwrite:
@@ -398,14 +496,14 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
         if ans.lower().strip() != 'y':
             print("Skipping report generation.")
             return
-    os.makedirs(args.out_dir, exist_ok=True)
-    os.makedirs(args.plot_dir, exist_ok=True)
+    os.makedirs(out_dir, exist_ok=True)
+    os.makedirs(plot_dir, exist_ok=True)
     
     df.to_csv(csv_path, index=False)
 
     science_gen_summary = pd.DataFrame()
     if science_audit_df is not None and not science_audit_df.empty:
-        science_audit_df.to_csv(os.path.join(args.out_dir, f'{prefix}science_generation_audit.csv'), index=False)
+        science_audit_df.to_csv(os.path.join(out_dir, f'{prefix}science_generation_audit.csv'), index=False)
         science_gen_summary = science_audit_df.groupby('generator').agg(
             Total=('item_id', 'count'),
             Correct=('is_correct', 'sum'),
@@ -415,7 +513,7 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
         science_gen_summary['Accuracy'] = science_gen_summary['Correct'] / science_gen_summary['Total'].clip(lower=1)
         science_gen_summary['Parse_Rate'] = science_gen_summary['Parsed'] / science_gen_summary['Total'].clip(lower=1)
         science_gen_summary['Ambiguous_Rate'] = science_gen_summary['Ambiguous'] / science_gen_summary['Total'].clip(lower=1)
-        science_gen_summary.to_csv(os.path.join(args.out_dir, f'{prefix}science_generator_summary.csv'), index=False)
+        science_gen_summary.to_csv(os.path.join(out_dir, f'{prefix}science_generator_summary.csv'), index=False)
     
     agg = df.groupby(['domain', 'verifier', 'frame', 'strategy']).agg(
         Total=('item_id', 'count'),
@@ -441,7 +539,7 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
     behavior_df['Errors_Passed_Rate'] = agg['FP'] / (agg['TN'] + agg['FP']).replace(0, 1)
     behavior_df['Errors_Introduced_Rate'] = agg['FN'] / (agg['FN'] + agg['TP']).replace(0, 1)
     behavior_df['Correct_Confirmed_Rate'] = agg['TP'] / (agg['FN'] + agg['TP']).replace(0, 1)
-    behavior_df.to_csv(os.path.join(args.out_dir, f'{prefix}verifier_behavior_rates.csv'), index=False)
+    behavior_df.to_csv(os.path.join(out_dir, f'{prefix}verifier_behavior_rates.csv'), index=False)
 
     # Domain-specific checks are kept separate from the headline metrics so the
     # cross-domain report remains balanced while each domain stays auditable.
@@ -476,13 +574,13 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
         science_diag['Candidate_Parse_Rate'] = science_diag['Candidate_Parsed'] / science_diag['Total'].clip(lower=1)
         science_diag['Candidate_Ambiguous_Rate'] = science_diag['Candidate_Ambiguous'] / science_diag['Total'].clip(lower=1)
         science_diag['Dissociation_Rate'] = science_diag['Dissociated'] / science_diag['Total'].clip(lower=1)
-        science_diag.to_csv(os.path.join(args.out_dir, f'{prefix}science_verifier_diagnostics.csv'), index=False)
+        science_diag.to_csv(os.path.join(out_dir, f'{prefix}science_verifier_diagnostics.csv'), index=False)
 
         science_mask = domain_validity_df['domain'] == 'science'
         domain_validity_df.loc[science_mask, 'Science_Candidate_Parse_Rate'] = science_df['candidate_answer_parsed'].mean()
         domain_validity_df.loc[science_mask, 'Science_Candidate_Ambiguous_Rate'] = science_df['candidate_answer_ambiguous'].mean()
 
-    domain_validity_df.to_csv(os.path.join(args.out_dir, f'{prefix}domain_validity_checks.csv'), index=False)
+    domain_validity_df.to_csv(os.path.join(out_dir, f'{prefix}domain_validity_checks.csv'), index=False)
     
     # Bias and P-Values
     bias_df = agg[agg['frame'].isin(['self', 'other'])]
@@ -493,7 +591,7 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
     if 'other' in pivot_fnr.columns and 'self' in pivot_fnr.columns:
         pivot_fnr['FNR_Self_Bias'] = pivot_fnr['self'] - pivot_fnr['other']
     bias_merged = pd.merge(pivot_fpr, pivot_fnr, on=['domain', 'verifier', 'strategy'], suffixes=('_FPR', '_FNR'))
-    bias_merged.to_csv(os.path.join(args.out_dir, f'{prefix}bias_metrics.csv'), index=False)
+    bias_merged.to_csv(os.path.join(out_dir, f'{prefix}bias_metrics.csv'), index=False)
     
     # P-values computed PER (verifier, domain, strategy) cell so they actually test the same
     # slice of data as the bias number they're reported next to (previously this was collapsed
@@ -527,7 +625,7 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
     ).reset_index()
     belief_reality['Accuracy'] = (belief_reality['TP'] + belief_reality['TN']) / belief_reality['Valid'].clip(lower=1)
     belief_reality['FPR'] = belief_reality['FP'] / (belief_reality['FP'] + belief_reality['TN']).replace(0, 1)
-    belief_reality.to_csv(os.path.join(args.out_dir, f'{prefix}belief_vs_reality.csv'), index=False)
+    belief_reality.to_csv(os.path.join(out_dir, f'{prefix}belief_vs_reality.csv'), index=False)
 
     sns.set_theme(style="whitegrid")
     
@@ -535,7 +633,7 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
     sns.barplot(data=agg, x='domain', y='Accuracy', hue='verifier', errorbar=None)
     plt.title('Verifier Accuracy by Domain')
     plt.ylim(0, 1.1)
-    plt.savefig(os.path.join(args.plot_dir, f'{prefix}accuracy_by_domain.png'))
+    plt.savefig(os.path.join(plot_dir, f'{prefix}accuracy_by_domain.png'))
     plt.close()
     
     if 'FPR_Self_Bias' in bias_merged.columns:
@@ -544,7 +642,7 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
         plt.title('Self-Preservation Bias (FPR Gap: Self - Other)')
         plt.ylabel('FPR Difference')
         plt.axhline(0, color='black', linestyle='--')
-        plt.savefig(os.path.join(args.plot_dir, f'{prefix}fpr_self_bias.png'))
+        plt.savefig(os.path.join(plot_dir, f'{prefix}fpr_self_bias.png'))
         plt.close()
 
     if 'FNR_Self_Bias' in bias_merged.columns:
@@ -553,7 +651,7 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
         plt.title('Self-Doubt Bias (FNR Gap: Self - Other)')
         plt.ylabel('FNR Difference')
         plt.axhline(0, color='black', linestyle='--')
-        plt.savefig(os.path.join(args.plot_dir, f'{prefix}fnr_self_bias.png'))
+        plt.savefig(os.path.join(plot_dir, f'{prefix}fnr_self_bias.png'))
         plt.close()
 
     for verifier in df['verifier'].unique():
@@ -562,10 +660,10 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
         plt.figure(figsize=(6, 5))
         sns.heatmap(matrix, annot=True, fmt='d', cmap='Blues', xticklabels=['Predicted False', 'Predicted True'], yticklabels=['Actual False', 'Actual True'])
         plt.title(f'Confusion Matrix - {verifier}')
-        plt.savefig(os.path.join(args.plot_dir, f'{prefix}confusion_matrix_{verifier}.png'))
+        plt.savefig(os.path.join(plot_dir, f'{prefix}confusion_matrix_{verifier}.png'))
         plt.close()
 
-    summary_path = os.path.join(args.out_dir, f'{prefix}executive_summary.md')
+    summary_path = os.path.join(out_dir, f'{prefix}executive_summary.md')
     with open(summary_path, 'w', encoding='utf-8') as f:
         f.write("# Dynamic Executive Summary\n\n")
         f.write(f"**Total Verifications Processed:** {agg['Total'].sum()}\n")
@@ -575,7 +673,7 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
             f.write("\n")
         
         f.write("## Highest Accuracy by Domain\n")
-        f.write(f"![Accuracy Plot](../{args.plot_dir}/{prefix}accuracy_by_domain.png)\n\n")
+        f.write(f"![Accuracy Plot](../../../{plot_dir_md}/{prefix}accuracy_by_domain.png)\n\n")
         for domain in sorted(df['domain'].unique()):
             dom_df = agg[agg['domain'] == domain]
             best_row = dom_df.loc[dom_df['Accuracy'].idxmax()]
@@ -632,7 +730,7 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
         f.write("\n## 6. Statistical Bias (Self vs Other)\n")
         f.write("### Top 3 Highest Self-Preservation Biases (FPR Gap)\n")
         f.write("*These models were most likely to falsely approve their own mistakes.*\n")
-        f.write(f"![FPR Bias Plot](../{args.plot_dir}/{prefix}fpr_self_bias.png)\n\n")
+        f.write(f"![FPR Bias Plot](../../../{plot_dir_md}/{prefix}fpr_self_bias.png)\n\n")
         if 'FPR_Self_Bias' in bias_merged.columns:
             top_fpr = bias_merged.sort_values(by='FPR_Self_Bias', ascending=False).head(3)
             for _, row in top_fpr.iterrows():
@@ -640,7 +738,7 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
                 
         f.write("\n### Top 3 Highest Self-Doubt Biases (FNR Gap)\n")
         f.write("*These models were most likely to falsely reject their own correct answers.*\n")
-        f.write(f"![FNR Bias Plot](../{args.plot_dir}/{prefix}fnr_self_bias.png)\n\n")
+        f.write(f"![FNR Bias Plot](../../../{plot_dir_md}/{prefix}fnr_self_bias.png)\n\n")
         if 'FNR_Self_Bias' in bias_merged.columns:
             top_fnr = bias_merged.sort_values(by='FNR_Self_Bias', ascending=False).head(3)
             for _, row in top_fnr.iterrows():
@@ -722,9 +820,9 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
             fn = mod_df['fn'].sum()
             f.write(f"### {verifier}\n")
             f.write(f"**True Positives:** {tp} | **False Positives:** {fp} | **True Negatives:** {tn} | **False Negatives:** {fn}\n\n")
-            f.write(f"![Confusion Matrix {verifier}](../{args.plot_dir}/{prefix}confusion_matrix_{verifier}.png)\n")
+            f.write(f"![Confusion Matrix {verifier}](../../../{plot_dir_md}/{prefix}confusion_matrix_{verifier}.png)\n")
             
-    print(f"Reports successfully generated in {args.out_dir}/ and {args.plot_dir}/")
+    print(f"Reports successfully generated in {out_dir}/ and {plot_dir}/")
 
 def main():
     args = parse_args()
