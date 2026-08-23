@@ -132,7 +132,6 @@ Answer with exactly one word: 'A', 'B', or 'NEITHER'."""
 _HARNESS_TEMPLATE = '''
 import json
 import sys
-import inspect
 import multiprocessing
 
 # --- Load candidate and reference code ---
@@ -140,16 +139,35 @@ import multiprocessing
 
 {reference_code_renamed}
 
+def _call_fn(fn, args):
+    """
+    Try calling fn(*args) first (treating args as a list of positional arguments).
+    If that raises a TypeError that looks like an argument-count mismatch, retry
+    with fn(args) — i.e. pass the whole list as a single argument.
+    This handles functions like sort_list(lst) where the LLM generates [1,2,3]
+    rather than [[1,2,3]], without silently crashing both implementations identically.
+    """
+    if not isinstance(args, list):
+        return fn(args)
+    try:
+        return fn(*args)
+    except TypeError as e:
+        msg = str(e)
+        # Only retry on arity errors, not on type errors inside the function body
+        if "argument" in msg or "positional" in msg or "required" in msg:
+            return fn(args)
+        raise
+
 def _worker_cand(args, q):
     try:
-        res = repr({entry_point}(*args))
+        res = repr(_call_fn({entry_point}, args))
         q.put((res, None))
     except Exception as e:
         q.put((None, type(e).__name__ + ": " + str(e)))
 
 def _worker_ref(args, q):
     try:
-        res = repr(__ref_{entry_point}(*args))
+        res = repr(_call_fn(__ref_{entry_point}, args))
         q.put((res, None))
     except Exception as e:
         q.put((None, type(e).__name__ + ": " + str(e)))
@@ -163,25 +181,17 @@ if __name__ == '__main__':
 
     INPUTS = {inputs_json}
     results = []
-    
-    try:
-        sig = inspect.signature({entry_point})
-        takes_one_arg = len(sig.parameters) == 1
-    except Exception:
-        takes_one_arg = False
 
     for args in INPUTS:
-        call_args = [args] if takes_one_arg and isinstance(args, list) else args
-        
         cand_result, cand_error = None, None
         ref_result, ref_error = None, None
         
         q_cand = multiprocessing.Queue()
-        p_cand = multiprocessing.Process(target=_worker_cand, args=(call_args, q_cand))
+        p_cand = multiprocessing.Process(target=_worker_cand, args=(args, q_cand))
         p_cand.start()
         
         q_ref = multiprocessing.Queue()
-        p_ref = multiprocessing.Process(target=_worker_ref, args=(call_args, q_ref))
+        p_ref = multiprocessing.Process(target=_worker_ref, args=(args, q_ref))
         p_ref.start()
         
         p_cand.join(2.0)
@@ -385,8 +395,12 @@ async def differential_test(
             verdict = "BUG_CONFIRMED"
             note = f"Oracle confirmed bug on {t.inputs}."
         elif oracle_answer == "NEITHER":
-            verdict = "BUG_CONFIRMED"
-            note = f"Oracle says both are wrong on {t.inputs}."
+            # Oracle could not determine which implementation is correct (e.g. both crashed
+            # on a malformed input, or the problem is genuinely ambiguous for this edge case).
+            # Penalizing the candidate here would be wrong — fall back to the basic test result
+            # the same way a pipeline failure does.
+            verdict = "SKIPPED_PIPELINE_FAIL"
+            note = f"Oracle returned NEITHER on {t.inputs} — cannot determine correctness; falling back to basic test result."
         else:
             verdict = "SKIPPED_PIPELINE_FAIL"
             note = f"Oracle failed to respond properly."

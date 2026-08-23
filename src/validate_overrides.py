@@ -47,7 +47,7 @@ def _already_done(path):
     return done
 
 
-async def process_domain(domain="code", is_pilot=True):
+async def process_domain(domain="code", is_pilot=True, overwrite=False):
     if domain != "code":
         return  # only code has execution-checkable ground truth to compare against
 
