@@ -1,0 +1,4 @@
+domain,Total,Formatting_Fails,Code_Overrode_Passing_Tests,Formatting_Failure_Rate,Science_Candidate_Parse_Rate,Science_Candidate_Ambiguous_Rate
+code,1440,1,70,0.0006944444444444445,,
+math,1440,0,0,0.0,,
+science,1440,0,0,0.0,1.0,0.0
