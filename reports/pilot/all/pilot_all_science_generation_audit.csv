@@ -1,0 +1,45 @@
+item_id,generator,ground_truth_letter,ground_truth_text,extracted_letter,extracted_option_text,extraction_mode,extraction_confidence,ambiguous,parsed_successfully,parse_notes,is_correct
+science_0,qwen,D,pre-replication complex,C,nucleosome histone complex,strict_final_answer,high,0,1,,0
+science_0,deepseek,D,pre-replication complex,D,pre-replication complex,strict_final_answer,high,0,1,,1
+science_0,llama,D,pre-replication complex,D,pre-replication complex,strict_final_answer,high,0,1,,1
+science_0,mistral,D,pre-replication complex,B,pre-initiation complex,strict_final_answer,high,0,1,,0
+science_1,qwen,D,cytosol to the extracellular space,D,cytosol to the extracellular space,strict_final_answer,high,0,1,,1
+science_1,deepseek,D,cytosol to the extracellular space,B,ribosome to the proteasome,strict_final_answer,high,0,1,,0
+science_1,llama,D,cytosol to the extracellular space,D,cytosol to the extracellular space,strict_final_answer,high,0,1,,1
+science_1,mistral,D,cytosol to the extracellular space,B,ribosome to the proteasome,strict_final_answer,high,0,1,,0
+science_2,qwen,B,"4-ethyl-3-methyldeca-1,5-diene",C,"5-ethyl-4-methyldeca-2,6-diene",strict_final_answer,high,0,1,option_map_issue:option D duplicates option C,0
+science_2,deepseek,B,"4-ethyl-3-methyldeca-1,5-diene",C,"5-ethyl-4-methyldeca-2,6-diene",strict_final_answer,high,0,1,option_map_issue:option D duplicates option C,0
+science_2,llama,B,"4-ethyl-3-methyldeca-1,5-diene",C,"5-ethyl-4-methyldeca-2,6-diene",strict_final_answer,high,0,1,option_map_issue:option D duplicates option C,0
+science_2,mistral,B,"4-ethyl-3-methyldeca-1,5-diene",C,"5-ethyl-4-methyldeca-2,6-diene",strict_final_answer,high,0,1,option_map_issue:option D duplicates option C,0
+science_3,qwen,A,ethyl 4-aminobenzoate,A,ethyl 4-aminobenzoate,strict_final_answer,high,0,1,,1
+science_3,deepseek,A,ethyl 4-aminobenzoate,A,ethyl 4-aminobenzoate,strict_final_answer,high,0,1,,1
+science_3,llama,A,ethyl 4-aminobenzoate,A,ethyl 4-aminobenzoate,strict_final_answer,high,0,1,,1
+science_3,mistral,A,ethyl 4-aminobenzoate,A,ethyl 4-aminobenzoate,strict_final_answer,high,0,1,,1
+science_4,qwen,D,0.85,D,0.85,strict_final_answer,high,0,1,,1
+science_4,deepseek,D,0.85,D,0.85,strict_final_answer,high,0,1,,1
+science_4,llama,D,0.85,D,0.85,strict_final_answer,high,0,1,,1
+science_4,mistral,D,0.85,D,0.85,strict_final_answer,high,0,1,,1
+science_5,qwen,C,"G2 is a transcription factor, G1 and G3 show gene redundancy, G1 is epistatic towards G3",C,"G2 is a transcription factor, G1 and G3 show gene redundancy, G1 is epistatic towards G3",strict_final_answer,high,0,1,,1
+science_5,deepseek,C,"G2 is a transcription factor, G1 and G3 show gene redundancy, G1 is epistatic towards G3",C,"G2 is a transcription factor, G1 and G3 show gene redundancy, G1 is epistatic towards G3",strict_final_answer,high,0,1,,1
+science_5,llama,C,"G2 is a transcription factor, G1 and G3 show gene redundancy, G1 is epistatic towards G3",C,"G2 is a transcription factor, G1 and G3 show gene redundancy, G1 is epistatic towards G3",strict_final_answer,high,0,1,,1
+science_5,mistral,C,"G2 is a transcription factor, G1 and G3 show gene redundancy, G1 is epistatic towards G3",C,"G2 is a transcription factor, G1 and G3 show gene redundancy, G1 is epistatic towards G3",strict_final_answer,high,0,1,,1
+science_6,qwen,C,315,C,315,strict_final_answer,high,0,1,,1
+science_6,deepseek,C,315,B,185,strict_final_answer,high,0,1,,0
+science_6,llama,C,315,B,185,strict_final_answer,high,0,1,,0
+science_6,mistral,C,315,D,333,strict_final_answer,high,0,1,,0
+science_7,qwen,D,the receptor and the eGFP are not in the frame,B,the receptor-eGFP construct is stuck in the Golgi,strict_final_answer,high,0,1,,0
+science_7,deepseek,D,the receptor and the eGFP are not in the frame,D,the receptor and the eGFP are not in the frame,strict_final_answer,high,0,1,,1
+science_7,llama,D,the receptor and the eGFP are not in the frame,D,the receptor and the eGFP are not in the frame,strict_final_answer,high,0,1,,1
+science_7,mistral,D,the receptor and the eGFP are not in the frame,D,the receptor and the eGFP are not in the frame,strict_final_answer,high,0,1,,1
+science_8,qwen,A,110-130,C,140-160,strict_final_answer,high,0,1,,0
+science_8,deepseek,A,110-130,B,160-180,strict_final_answer,high,0,1,,0
+science_8,llama,A,110-130,C,140-160,strict_final_answer,high,0,1,,0
+science_8,mistral,A,110-130,B,160-180,strict_final_answer,high,0,1,,0
+science_9,qwen,B,"251.271 fm
+",B,251.271 fm,strict_final_answer,high,0,1,,1
+science_9,deepseek,B,"251.271 fm
+",D,177.675 fm,strict_final_answer,high,0,1,,0
+science_9,llama,B,"251.271 fm
+",B,251.271 fm,strict_final_answer,high,0,1,,1
+science_9,mistral,B,"251.271 fm
+",B,251.271 fm,strict_final_answer,high,0,1,,1

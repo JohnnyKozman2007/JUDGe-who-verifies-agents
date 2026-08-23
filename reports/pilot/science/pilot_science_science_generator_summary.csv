@@ -1,0 +1,5 @@
+generator,Total,Correct,Parsed,Ambiguous,Accuracy,Parse_Rate,Ambiguous_Rate
+deepseek,10,5,10,0,0.5,1.0,0.0
+llama,10,7,10,0,0.7,1.0,0.0
+mistral,10,5,10,0,0.5,1.0,0.0
+qwen,10,6,10,0,0.6,1.0,0.0

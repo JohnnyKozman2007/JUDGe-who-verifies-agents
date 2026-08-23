@@ -1,0 +1,13 @@
+domain,verifier,strategy,other_FPR,self_FPR,FPR_Self_Bias,other_FNR,self_FNR,FNR_Self_Bias
+math,deepseek,cot,0.2,0.3,0.09999999999999998,0.0,0.03333333333333333,0.03333333333333333
+math,deepseek,direct,0.3,0.4,0.10000000000000003,0.0,0.0,0.0
+math,deepseek,rubric,0.2,0.2,0.0,0.0,0.03333333333333333,0.03333333333333333
+math,llama,cot,0.3,0.3,0.0,0.0,0.0,0.0
+math,llama,direct,0.4,0.5,0.09999999999999998,0.0,0.0,0.0
+math,llama,rubric,0.4,0.3,-0.10000000000000003,0.0,0.0,0.0
+math,mistral,cot,0.7,0.7,0.0,0.03333333333333333,0.0,-0.03333333333333333
+math,mistral,direct,0.8,0.9,0.09999999999999998,0.0,0.0,0.0
+math,mistral,rubric,0.6,0.6,0.0,0.06666666666666667,0.1,0.03333333333333334
+math,qwen,cot,0.4,0.4,0.0,0.0,0.0,0.0
+math,qwen,direct,0.4,0.4,0.0,0.0,0.0,0.0
+math,qwen,rubric,0.4,0.4,0.0,0.0,0.0,0.0
