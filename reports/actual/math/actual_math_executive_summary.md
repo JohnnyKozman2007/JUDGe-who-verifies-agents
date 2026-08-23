@@ -3,7 +3,7 @@
 **Total Verifications Processed:** 21600
 
 ## Highest Accuracy by Domain
-![Accuracy Plot](../plots/actual_math_accuracy_by_domain.png)
+![Accuracy Plot](../../../plots/actual/math/actual_math_accuracy_by_domain.png)
 
 - **Math**: deepseek (Frame: neutral, Strategy: rubric) achieved **69.2%** accuracy (**69.2% Adjusted**).
 
@@ -50,8 +50,8 @@
 - **qwen**: 66.5%
 ### Top 3 Best Ownership + Strategy Combos
 - **other + cot**: 64.8%
-- **other + rubric**: 64.8%
 - **self + cot**: 64.8%
+- **other + rubric**: 64.8%
 
 ## 1b. Comprehensive Accuracy Breakdown (Adjusted)
 ### Overall Average Across Everything
@@ -73,8 +73,8 @@
 - **qwen**: 66.5%
 ### Top 3 Best Ownership + Strategy Combos
 - **other + cot**: 64.8%
-- **other + rubric**: 64.8%
 - **self + cot**: 64.8%
+- **other + rubric**: 64.8%
 
 ## 2. Formatting Failure Rates (NaN / Instructions Missed)
 ### Overall Average Across Everything
@@ -122,33 +122,6 @@
 - **neutral + cot**: 285.8
 - **self + cot**: 285.1
 
-## 4. Dissociation Rates (Hallucinated Verdicts)
-### Overall Average Across Everything
-- **Overall**: 5.3%
-### By Domain
-- **Math**: 5.3%
-### By Strategy
-- **cot**: 5.4%
-- **rubric**: 5.2%
-### By Ownership Frame
-- **neutral**: 5.2%
-- **other**: 5.6%
-- **self**: 5.0%
-### By Model
-- **deepseek**: 6.9%
-- **llama**: 5.1%
-- **mistral**: 2.6%
-- **qwen**: 6.4%
-### Top 3 Best Ownership + Strategy Combos
-- **self + rubric**: 4.8%
-- **self + cot**: 5.2%
-- **neutral + cot**: 5.2%
-
-### Dissociation Deep Dive (Reasoning vs Label)
-Out of 758 hallucinated verifications:
-- **Label was Right / Reasoning was Wrong**: 69.5% of the time.
-- **Reasoning was Right / Label was Wrong**: 30.5% of the time.
-
 ## 5. Verifier Behavior Rates
 ### Overall Averages
 - **Overall** -> Caught: 26.4% | Passed: 73.6% | Introduced: 5.6% | Confirmed: 94.4%
@@ -171,7 +144,7 @@ Out of 758 hallucinated verifications:
 ## 6. Statistical Bias (Self vs Other)
 ### Top 3 Highest Self-Preservation Biases (FPR Gap)
 *These models were most likely to falsely approve their own mistakes.*
-![FPR Bias Plot](../plots/actual_math_fpr_self_bias.png)
+![FPR Bias Plot](../../../plots/actual/math/actual_math_fpr_self_bias.png)
 
 - **mistral** (math, rubric): **+3.8%** bias
 - **mistral** (math, cot): **+2.7%** bias
@@ -179,17 +152,95 @@ Out of 758 hallucinated verifications:
 
 ### Top 3 Highest Self-Doubt Biases (FNR Gap)
 *These models were most likely to falsely reject their own correct answers.*
-![FNR Bias Plot](../plots/actual_math_fnr_self_bias.png)
+![FNR Bias Plot](../../../plots/actual/math/actual_math_fnr_self_bias.png)
 
 - **deepseek** (math, direct): **+0.9%** bias
 - **deepseek** (math, rubric): **+0.9%** bias
 - **llama** (math, cot): **+-0.3%** bias
 
-### Statistical Significance (P-Values for Bias)
-*Chi-Square tests on raw False Positives/Negatives between Self and Other frames, computed PER (verifier, domain, strategy) cell - i.e. each p-value tests the exact same slice of data as the bias row above it. Small pilot sample sizes (~20/cell) mean most will read as not significant; that's expected at this scale, not a null result.*
+### Statistical Significance (P-Values for Bias) — Raw numbers, chi-square per (verifier, domain, strategy) cell.
+*Small pilot sample sizes (~20/cell) mean most will read as not significant; that's expected at this scale.*
 - **mistral** (math, rubric): FPR Bias p=0.2592 | FNR Bias p=1.0000
 - **mistral** (math, cot): FPR Bias p=0.4001 | FNR Bias p=0.5625
 - **deepseek** (math, rubric): FPR Bias p=0.6614 | FNR Bias p=0.8182
+
+## 6b. Statistical Bias — Fuzz-Adjusted (Corrected Ground Truth)
+*Same analysis as Section 6 but using fuzz-adjusted ground truth for the code domain. Rows where the fuzzer found a `REFERENCE_BUG` (reference was wrong) or `BUG_CONFIRMED` (candidate had a real bug) are reclassified before computing FPR/FNR. For math and science domains the adjusted numbers are identical to raw. Differences between raw and adjusted in code domain reflect the impact of oracle corrections.*
+
+### Top 3 Highest Adjusted Self-Preservation Biases (Adj FPR Gap)
+![Adj FPR Bias Plot](../../../plots/actual/math/actual_math_adj_fpr_self_bias.png)
+
+- **mistral** (math, rubric): **+3.8%** adjusted bias
+- **mistral** (math, cot): **+2.7%** adjusted bias
+- **deepseek** (math, rubric): **+2.3%** adjusted bias
+
+### Top 3 Highest Adjusted Self-Doubt Biases (Adj FNR Gap)
+![Adj FNR Bias Plot](../../../plots/actual/math/actual_math_adj_fnr_self_bias.png)
+
+- **deepseek** (math, direct): **+0.9%** adjusted bias
+- **deepseek** (math, rubric): **+0.9%** adjusted bias
+- **llama** (math, cot): **+-0.3%** adjusted bias
+
+### Statistical Significance (P-Values for Adjusted Bias)
+- **mistral** (math, rubric): Adj FPR Bias p=0.2592 | Adj FNR Bias p=1.0000
+- **mistral** (math, cot): Adj FPR Bias p=0.4001 | Adj FNR Bias p=0.5625
+- **deepseek** (math, rubric): Adj FPR Bias p=0.6614 | Adj FNR Bias p=0.8182
+
+Full adjusted bias table: `actual_math_adj_bias_metrics.csv`.
+
+## 6c. Oracle & Fuzzing Statistics (Code Domain)
+*These rows represent code verifications where the verifier overrode a passing execution result (i.e. test passed but verifier said incorrect). The fuzzer ran differential testing on each and an LLM oracle adjudicated mismatches. This section quantifies how often the verifier was right vs. wrong, and how often the benchmark reference itself was the problem.*
+
+**Total override cases fuzzed:** 1856
+
+### Verdict Breakdown
+
+| Verdict | Count | % of Fuzzed |
+|---|---|---|
+| `BUG_CONFIRMED` | 167 | 9.0% |
+| `REFERENCE_BUG` | 15 | 0.8% |
+| `NO_DISCREPANCY` | 1430 | 77.0% |
+| `SKIPPED_PIPELINE_FAIL` | 168 | 9.1% |
+
+### REFERENCE_BUG Deep Dive (15 cases)
+*These are items where the HumanEval+ reference solution itself appears to be incorrect. The verifier's override was justified — the candidate was actually more correct than the reference.*
+
+**Affected item IDs:** code_HumanEval_126, code_HumanEval_134, code_HumanEval_17, code_HumanEval_59, code_HumanEval_78
+
+**By generator model (which model's candidate was vindicated):**
+- qwen: 8
+- deepseek: 5
+- mistral: 1
+- llama: 1
+
+### Verdicts by Verifier Model
+
+| Verifier | BUG_CONFIRMED | REFERENCE_BUG | NO_DISCREPANCY | SKIPPED_PIPELINE_FAIL |
+|---|---|---|---|---|
+| deepseek | 9 | 3 | 137 | 10 |
+| llama | 25 | 0 | 206 | 18 |
+| mistral | 129 | 12 | 1018 | 132 |
+| qwen | 4 | 0 | 69 | 8 |
+
+### Verdicts by Generator Model
+
+| Generator | BUG_CONFIRMED | REFERENCE_BUG | NO_DISCREPANCY | SKIPPED_PIPELINE_FAIL |
+|---|---|---|---|---|
+| deepseek | 41 | 5 | 436 | 40 |
+| llama | 62 | 1 | 279 | 50 |
+| mistral | 17 | 1 | 322 | 17 |
+| qwen | 47 | 8 | 393 | 61 |
+
+### Verifier Override Accuracy
+*% of overrides that were JUSTIFIED (BUG_CONFIRMED) vs. UNJUSTIFIED (NO_DISCREPANCY or REFERENCE_BUG)*
+
+| Verifier | Total Overrides | Justified (%) | Unjustified (%) | Inconclusive (%) |
+|---|---|---|---|---|
+| deepseek | 159 | 5.7% | 88.1% | 6.3% |
+| llama | 249 | 10.0% | 82.7% | 7.2% |
+| mistral | 1291 | 10.0% | 79.8% | 10.2% |
+| qwen | 81 | 4.9% | 85.2% | 9.9% |
+
 
 ## 7. Domain-Specific Validity Checks
 *These checks are diagnostic safeguards around domain-specific grading. They support the shared metrics above; they do not replace the common accuracy/FPR/FNR analysis.*
@@ -236,16 +287,16 @@ Read this as 2x2 per verifier: (told self / actually self) vs (told self / actua
 ### deepseek
 **True Positives:** 2708 | **False Positives:** 1404 | **True Negatives:** 972 | **False Negatives:** 316
 
-![Confusion Matrix deepseek](../plots/actual_math_confusion_matrix_deepseek.png)
+![Confusion Matrix deepseek](../../../plots/actual/math/actual_math_confusion_matrix_deepseek.png)
 ### llama
 **True Positives:** 2943 | **False Positives:** 1809 | **True Negatives:** 567 | **False Negatives:** 81
 
-![Confusion Matrix llama](../plots/actual_math_confusion_matrix_llama.png)
+![Confusion Matrix llama](../../../plots/actual/math/actual_math_confusion_matrix_llama.png)
 ### mistral
 **True Positives:** 2915 | **False Positives:** 2138 | **True Negatives:** 238 | **False Negatives:** 109
 
-![Confusion Matrix mistral](../plots/actual_math_confusion_matrix_mistral.png)
+![Confusion Matrix mistral](../../../plots/actual/math/actual_math_confusion_matrix_mistral.png)
 ### qwen
 **True Positives:** 2857 | **False Positives:** 1642 | **True Negatives:** 734 | **False Negatives:** 167
 
-![Confusion Matrix qwen](../plots/actual_math_confusion_matrix_qwen.png)
+![Confusion Matrix qwen](../../../plots/actual/math/actual_math_confusion_matrix_qwen.png)

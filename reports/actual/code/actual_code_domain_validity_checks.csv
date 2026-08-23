@@ -1,2 +1,2 @@
 domain,Total,Formatting_Fails,Code_Overrode_Passing_Tests,Formatting_Failure_Rate,Science_Candidate_Parse_Rate,Science_Candidate_Ambiguous_Rate
-science,21600,0,0,0.0,0.9983333333333333,0.0016666666666666668
+code,21600,0,1458,0.0,,
