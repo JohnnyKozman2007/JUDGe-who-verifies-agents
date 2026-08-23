@@ -1,2 +1,2 @@
-domain,Total,Formatting_Fails,Dissociated,Code_Overrode_Passing_Tests,Formatting_Failure_Rate,Dissociation_Rate,Science_Candidate_Parse_Rate,Science_Candidate_Ambiguous_Rate
-science,21600,0,2142,0,0.0,0.09916666666666667,0.9983333333333333,0.0016666666666666668
+domain,Total,Formatting_Fails,Code_Overrode_Passing_Tests,Formatting_Failure_Rate,Science_Candidate_Parse_Rate,Science_Candidate_Ambiguous_Rate
+science,21600,0,0,0.0,0.9983333333333333,0.0016666666666666668

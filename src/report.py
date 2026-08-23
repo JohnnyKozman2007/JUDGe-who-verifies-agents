@@ -267,17 +267,29 @@ def load_and_grade(args):
     return graded_candidates, pd.DataFrame(science_audit_rows)
 
 def load_fuzz_results(args):
+    """Returns (fuzz_dict, fuzz_rows).
+
+    fuzz_dict  : {(item_id, gen, ver, frame, strategy) -> verdict_string}
+                 used downstream to adjust confusion-matrix cells.
+    fuzz_rows  : list of raw dicts from code_overrides*.jsonl
+                 used to build the oracle/fuzzing statistics section.
+    """
     mode = args.mode
     suffix = "_pilot.jsonl" if mode == "pilot" else ".jsonl"
     fuzz_dict = {}
+    fuzz_rows = []
     path = os.path.join("data", "validated", f"code_overrides{suffix}")
     if os.path.exists(path):
         with open(path, 'r', encoding='utf-8') as f:
             for line in f:
+                line = line.strip()
+                if not line:
+                    continue
                 item = json.loads(line)
                 key = (item['item_id'], item['generator_model'], item['verifier_model'], item['frame'], item['strategy'])
                 fuzz_dict[key] = item.get('fuzz_verdict')
-    return fuzz_dict
+                fuzz_rows.append(item)
+    return fuzz_dict, fuzz_rows
 
 def analyze_verifications(args, graded_candidates, fuzz_dict):
     mode = args.mode
@@ -452,7 +464,7 @@ def write_behavior_breakdown(f, title, df, group_col=None):
             conf = agg_b['tp'] / max(1, agg_b['fn'] + agg_b['tp'])
             f.write(f"- **{g}** -> Caught: {caught*100:.1f}% | Passed: {passed*100:.1f}% | Introduced: {intro*100:.1f}% | Confirmed: {conf*100:.1f}%\n")
 
-def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=None):
+def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=None, fuzz_rows=None):
     # Determine prefix based on mode (pilot/actual). 
     mode = args.mode
     valid_domains = ["math", "code", "science"]
@@ -505,6 +517,10 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
     agg['Adjusted_Accuracy'] = (agg['Adj_TP'] + agg['Adj_TN']) / agg['Valid_Total']
     agg['FPR'] = agg['FP'] / (agg['FP'] + agg['TN']).replace(0, 1)
     agg['FNR'] = agg['FN'] / (agg['FN'] + agg['TP']).replace(0, 1)
+    # Adjusted FPR/FNR use fuzz-corrected ground truth (matters for code domain where
+    # REFERENCE_BUG and BUG_CONFIRMED verdicts flip the effective ground truth label)
+    agg['Adj_FPR'] = agg['Adj_FP'] / (agg['Adj_FP'] + agg['Adj_TN']).replace(0, 1)
+    agg['Adj_FNR'] = agg['Adj_FN'] / (agg['Adj_FN'] + agg['Adj_TP']).replace(0, 1)
     agg['Formatting_Failure_Rate'] = agg['Formatting_Fails'] / agg['Total']
     
     # Behavior Rates Export
@@ -552,7 +568,7 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
 
     domain_validity_df.to_csv(os.path.join(out_dir, f'{prefix}domain_validity_checks.csv'), index=False)
     
-    # Bias and P-Values
+    # ── Raw Bias Metrics ────────────────────────────────────────────────────
     bias_df = agg[agg['frame'].isin(['self', 'other'])]
     pivot_fpr = bias_df.pivot_table(index=['domain', 'verifier', 'strategy'], columns='frame', values='FPR').reset_index()
     if 'other' in pivot_fpr.columns and 'self' in pivot_fpr.columns:
@@ -562,25 +578,43 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
         pivot_fnr['FNR_Self_Bias'] = pivot_fnr['self'] - pivot_fnr['other']
     bias_merged = pd.merge(pivot_fpr, pivot_fnr, on=['domain', 'verifier', 'strategy'], suffixes=('_FPR', '_FNR'))
     bias_merged.to_csv(os.path.join(out_dir, f'{prefix}bias_metrics.csv'), index=False)
-    
+
+    # ── Adjusted Bias Metrics (fuzz-corrected ground truth) ─────────────────
+    pivot_adj_fpr = bias_df.pivot_table(index=['domain', 'verifier', 'strategy'], columns='frame', values='Adj_FPR').reset_index()
+    if 'other' in pivot_adj_fpr.columns and 'self' in pivot_adj_fpr.columns:
+        pivot_adj_fpr['Adj_FPR_Self_Bias'] = pivot_adj_fpr['self'] - pivot_adj_fpr['other']
+    pivot_adj_fnr = bias_df.pivot_table(index=['domain', 'verifier', 'strategy'], columns='frame', values='Adj_FNR').reset_index()
+    if 'other' in pivot_adj_fnr.columns and 'self' in pivot_adj_fnr.columns:
+        pivot_adj_fnr['Adj_FNR_Self_Bias'] = pivot_adj_fnr['self'] - pivot_adj_fnr['other']
+    adj_bias_merged = pd.merge(pivot_adj_fpr, pivot_adj_fnr, on=['domain', 'verifier', 'strategy'], suffixes=('_Adj_FPR', '_Adj_FNR'))
+    adj_bias_merged.to_csv(os.path.join(out_dir, f'{prefix}adj_bias_metrics.csv'), index=False)
+
+    # ── P-Values (raw) ───────────────────────────────────────────────────────
     # P-values computed PER (verifier, domain, strategy) cell so they actually test the same
-    # slice of data as the bias number they're reported next to (previously this was collapsed
-    # across all domains/strategies, which tested a different, blended dataset than the rows
-    # it appeared under). Expect many "not significant" results at pilot N (~20/cell) - that's
-    # honest, not a flaw; it'll sharpen once cell sizes grow in the full run.
+    # slice of data as the bias number they're reported next to. Expect many "not significant"
+    # results at pilot N (~20/cell) — that's honest, not a null result.
     cell_p_values = {}
+    cell_p_values_adj = {}
     overall_bias = df[df['frame'].isin(['self', 'other'])].groupby(['verifier', 'domain', 'strategy', 'frame']).agg(
-        TP=('tp', 'sum'), FP=('fp', 'sum'), TN=('tn', 'sum'), FN=('fn', 'sum')
+        TP=('tp', 'sum'), FP=('fp', 'sum'), TN=('tn', 'sum'), FN=('fn', 'sum'),
+        Adj_TP=('adj_tp', 'sum'), Adj_FP=('adj_fp', 'sum'), Adj_TN=('adj_tn', 'sum'), Adj_FN=('adj_fn', 'sum'),
     ).reset_index()
     for (verifier, domain, strategy), cell_df in overall_bias.groupby(['verifier', 'domain', 'strategy']):
         if 'self' in cell_df['frame'].values and 'other' in cell_df['frame'].values:
-            self_row = cell_df[cell_df['frame'] == 'self'].iloc[0]
-            other_row = cell_df[cell_df['frame'] == 'other'].iloc[0]
-            try: _, p_fpr, _, _ = chi2_contingency([[self_row['FP'], self_row['TN']], [other_row['FP'], other_row['TN']]])
+            sr = cell_df[cell_df['frame'] == 'self'].iloc[0]
+            or_ = cell_df[cell_df['frame'] == 'other'].iloc[0]
+            # Raw p-values
+            try: _, p_fpr, _, _ = chi2_contingency([[sr['FP'], sr['TN']], [or_['FP'], or_['TN']]])
             except Exception: p_fpr = 1.0
-            try: _, p_fnr, _, _ = chi2_contingency([[self_row['FN'], self_row['TP']], [other_row['FN'], other_row['TP']]])
+            try: _, p_fnr, _, _ = chi2_contingency([[sr['FN'], sr['TP']], [or_['FN'], or_['TP']]])
             except Exception: p_fnr = 1.0
             cell_p_values[(verifier, domain, strategy)] = {'fpr_p': p_fpr, 'fnr_p': p_fnr}
+            # Adjusted p-values
+            try: _, p_adj_fpr, _, _ = chi2_contingency([[sr['Adj_FP'], sr['Adj_TN']], [or_['Adj_FP'], or_['Adj_TN']]])
+            except Exception: p_adj_fpr = 1.0
+            try: _, p_adj_fnr, _, _ = chi2_contingency([[sr['Adj_FN'], sr['Adj_TP']], [or_['Adj_FN'], or_['Adj_TP']]])
+            except Exception: p_adj_fnr = 1.0
+            cell_p_values_adj[(verifier, domain, strategy)] = {'fpr_p': p_adj_fpr, 'fnr_p': p_adj_fnr}
 
     # --- Belief-vs-Reality analysis (answers Primary Question #1) ---
     # Crosses the TOLD frame against the ACTUAL (ground-truth) source, so we can separate
@@ -618,10 +652,28 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
     if 'FNR_Self_Bias' in bias_merged.columns:
         plt.figure(figsize=(10, 6))
         sns.barplot(data=bias_merged, x='domain', y='FNR_Self_Bias', hue='verifier', errorbar=None)
-        plt.title('Self-Doubt Bias (FNR Gap: Self - Other)')
+        plt.title('Self-Doubt Bias (FNR Gap: Self - Other) — Raw')
         plt.ylabel('FNR Difference')
         plt.axhline(0, color='black', linestyle='--')
         plt.savefig(os.path.join(plot_dir, f'{prefix}fnr_self_bias.png'))
+        plt.close()
+
+    if 'Adj_FPR_Self_Bias' in adj_bias_merged.columns:
+        plt.figure(figsize=(10, 6))
+        sns.barplot(data=adj_bias_merged, x='domain', y='Adj_FPR_Self_Bias', hue='verifier', errorbar=None)
+        plt.title('Self-Preservation Bias (FPR Gap: Self - Other) — Fuzz-Adjusted')
+        plt.ylabel('Adjusted FPR Difference')
+        plt.axhline(0, color='black', linestyle='--')
+        plt.savefig(os.path.join(plot_dir, f'{prefix}adj_fpr_self_bias.png'))
+        plt.close()
+
+    if 'Adj_FNR_Self_Bias' in adj_bias_merged.columns:
+        plt.figure(figsize=(10, 6))
+        sns.barplot(data=adj_bias_merged, x='domain', y='Adj_FNR_Self_Bias', hue='verifier', errorbar=None)
+        plt.title('Self-Doubt Bias (FNR Gap: Self - Other) — Fuzz-Adjusted')
+        plt.ylabel('Adjusted FNR Difference')
+        plt.axhline(0, color='black', linestyle='--')
+        plt.savefig(os.path.join(plot_dir, f'{prefix}adj_fnr_self_bias.png'))
         plt.close()
 
     for verifier in df['verifier'].unique():
@@ -702,15 +754,130 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
             for _, row in top_fnr.iterrows():
                 f.write(f"- **{row['verifier']}** ({row['domain']}, {row['strategy']}): **+{row['FNR_Self_Bias']*100:.1f}%** bias\n")
                 
-        f.write("\n### Statistical Significance (P-Values for Bias)\n")
-        f.write("*Chi-Square tests on raw False Positives/Negatives between Self and Other frames, computed PER (verifier, domain, strategy) cell "
-                "- i.e. each p-value tests the exact same slice of data as the bias row above it. Small pilot sample sizes (~20/cell) mean most "
-                "will read as not significant; that's expected at this scale, not a null result.*\n")
-        for _, row in top_fpr.iterrows() if 'FPR_Self_Bias' in bias_merged.columns else []:
+        f.write("\n### Statistical Significance (P-Values for Bias)")
+        f.write(" — Raw numbers, chi-square per (verifier, domain, strategy) cell.\n")
+        f.write("*Small pilot sample sizes (~20/cell) mean most will read as not significant; that's expected at this scale.*\n")
+        for _, row in (top_fpr.iterrows() if 'FPR_Self_Bias' in bias_merged.columns else []):
             key = (row['verifier'], row['domain'], row['strategy'])
             pv = cell_p_values.get(key)
             if pv:
                 f.write(f"- **{row['verifier']}** ({row['domain']}, {row['strategy']}): FPR Bias p={pv['fpr_p']:.4f} | FNR Bias p={pv['fnr_p']:.4f}\n")
+
+        f.write("\n## 6b. Statistical Bias — Fuzz-Adjusted (Corrected Ground Truth)\n")
+        f.write("*Same analysis as Section 6 but using fuzz-adjusted ground truth for the code domain. "
+                "Rows where the fuzzer found a `REFERENCE_BUG` (reference was wrong) or `BUG_CONFIRMED` "
+                "(candidate had a real bug) are reclassified before computing FPR/FNR. "
+                "For math and science domains the adjusted numbers are identical to raw. "
+                "Differences between raw and adjusted in code domain reflect the impact of oracle corrections.*\n\n")
+        f.write("### Top 3 Highest Adjusted Self-Preservation Biases (Adj FPR Gap)\n")
+        f.write(f"![Adj FPR Bias Plot](../../../{plot_dir_md}/{prefix}adj_fpr_self_bias.png)\n\n")
+        if 'Adj_FPR_Self_Bias' in adj_bias_merged.columns:
+            top_adj_fpr = adj_bias_merged.sort_values(by='Adj_FPR_Self_Bias', ascending=False).head(3)
+            for _, row in top_adj_fpr.iterrows():
+                f.write(f"- **{row['verifier']}** ({row['domain']}, {row['strategy']}): **+{row['Adj_FPR_Self_Bias']*100:.1f}%** adjusted bias\n")
+
+        f.write("\n### Top 3 Highest Adjusted Self-Doubt Biases (Adj FNR Gap)\n")
+        f.write(f"![Adj FNR Bias Plot](../../../{plot_dir_md}/{prefix}adj_fnr_self_bias.png)\n\n")
+        if 'Adj_FNR_Self_Bias' in adj_bias_merged.columns:
+            top_adj_fnr = adj_bias_merged.sort_values(by='Adj_FNR_Self_Bias', ascending=False).head(3)
+            for _, row in top_adj_fnr.iterrows():
+                f.write(f"- **{row['verifier']}** ({row['domain']}, {row['strategy']}): **+{row['Adj_FNR_Self_Bias']*100:.1f}%** adjusted bias\n")
+
+        f.write("\n### Statistical Significance (P-Values for Adjusted Bias)\n")
+        for _, row in (top_adj_fpr.iterrows() if 'Adj_FPR_Self_Bias' in adj_bias_merged.columns else []):
+            key = (row['verifier'], row['domain'], row['strategy'])
+            pv = cell_p_values_adj.get(key)
+            if pv:
+                f.write(f"- **{row['verifier']}** ({row['domain']}, {row['strategy']}): Adj FPR Bias p={pv['fpr_p']:.4f} | Adj FNR Bias p={pv['fnr_p']:.4f}\n")
+        f.write(f"\nFull adjusted bias table: `{prefix}adj_bias_metrics.csv`.\n")
+
+        # ── Section 6c: Oracle & Fuzzing Statistics ──────────────────────────
+        f.write("\n## 6c. Oracle & Fuzzing Statistics (Code Domain)\n")
+        f.write("*These rows represent code verifications where the verifier overrode a passing execution result "
+                "(i.e. test passed but verifier said incorrect). The fuzzer ran differential testing on each and "
+                "an LLM oracle adjudicated mismatches. This section quantifies how often the verifier was right "
+                "vs. wrong, and how often the benchmark reference itself was the problem.*\n\n")
+
+        if fuzz_rows:
+            fuzz_df = pd.DataFrame(fuzz_rows)
+            verdict_counts = fuzz_df['fuzz_verdict'].value_counts()
+            total_fuzz = len(fuzz_df)
+
+            f.write(f"**Total override cases fuzzed:** {total_fuzz}\n\n")
+            f.write("### Verdict Breakdown\n\n")
+            f.write("| Verdict | Count | % of Fuzzed |\n")
+            f.write("|---|---|---|\n")
+            verdict_order = ['BUG_CONFIRMED', 'REFERENCE_BUG', 'NO_DISCREPANCY', 'SKIPPED_PIPELINE_FAIL']
+            descriptions = {
+                'BUG_CONFIRMED':       'Verifier was right — candidate had a real bug',
+                'REFERENCE_BUG':       '⚠️ Reference (benchmark) was wrong — candidate was actually correct',
+                'NO_DISCREPANCY':      'Verifier was wrong — fuzzer found no difference between candidate and reference',
+                'SKIPPED_PIPELINE_FAIL': 'Oracle/fuzzer could not determine correctness — fell back to basic test result',
+            }
+            for v in verdict_order:
+                count = int(verdict_counts.get(v, 0))
+                pct = count / total_fuzz * 100 if total_fuzz > 0 else 0
+                desc = descriptions.get(v, '')
+                f.write(f"| `{v}` | {count} | {pct:.1f}% |\n")
+            f.write("\n")
+
+            # REFERENCE_BUG deep dive — these are benchmark quality issues
+            ref_bug_df = fuzz_df[fuzz_df['fuzz_verdict'] == 'REFERENCE_BUG']
+            if not ref_bug_df.empty:
+                f.write(f"### REFERENCE_BUG Deep Dive ({len(ref_bug_df)} cases)\n")
+                f.write("*These are items where the HumanEval+ reference solution itself appears to be incorrect. "
+                        "The verifier's override was justified — the candidate was actually more correct than the reference.*\n\n")
+                if 'item_id' in ref_bug_df.columns:
+                    f.write("**Affected item IDs:** " + ", ".join(map(str, sorted(ref_bug_df['item_id'].unique()))) + "\n\n")
+                by_gen = ref_bug_df['generator_model'].value_counts()
+                f.write("**By generator model (which model's candidate was vindicated):**\n")
+                for model, cnt in by_gen.items():
+                    f.write(f"- {model}: {cnt}\n")
+                f.write("\n")
+
+            # Per-verifier breakdown
+            f.write("### Verdicts by Verifier Model\n\n")
+            ver_pivot = fuzz_df.groupby(['verifier_model', 'fuzz_verdict']).size().unstack(fill_value=0)
+            for v in verdict_order:
+                if v not in ver_pivot.columns:
+                    ver_pivot[v] = 0
+            ver_pivot = ver_pivot[verdict_order]
+            cols = " | ".join(verdict_order)
+            f.write(f"| Verifier | {cols} |\n")
+            f.write("|---|" + "---|" * len(verdict_order) + "\n")
+            for verifier, row in ver_pivot.iterrows():
+                vals = " | ".join(str(int(row[v])) for v in verdict_order)
+                f.write(f"| {verifier} | {vals} |\n")
+            f.write("\n")
+
+            # Per-generator breakdown
+            f.write("### Verdicts by Generator Model\n\n")
+            gen_pivot = fuzz_df.groupby(['generator_model', 'fuzz_verdict']).size().unstack(fill_value=0)
+            for v in verdict_order:
+                if v not in gen_pivot.columns:
+                    gen_pivot[v] = 0
+            gen_pivot = gen_pivot[verdict_order]
+            f.write(f"| Generator | {cols} |\n")
+            f.write("|---|" + "---|" * len(verdict_order) + "\n")
+            for generator, row in gen_pivot.iterrows():
+                vals = " | ".join(str(int(row[v])) for v in verdict_order)
+                f.write(f"| {generator} | {vals} |\n")
+            f.write("\n")
+
+            # Verifier accuracy summary: what % of their overrides were justified
+            f.write("### Verifier Override Accuracy\n")
+            f.write("*% of overrides that were JUSTIFIED (BUG_CONFIRMED) vs. UNJUSTIFIED (NO_DISCREPANCY or REFERENCE_BUG)*\n\n")
+            f.write("| Verifier | Total Overrides | Justified (%) | Unjustified (%) | Inconclusive (%) |\n")
+            f.write("|---|---|---|---|---|\n")
+            for verifier, row in ver_pivot.iterrows():
+                total = row.sum()
+                justified = int(row.get('BUG_CONFIRMED', 0))
+                unjustified = int(row.get('NO_DISCREPANCY', 0)) + int(row.get('REFERENCE_BUG', 0))
+                inconclusive = int(row.get('SKIPPED_PIPELINE_FAIL', 0))
+                f.write(f"| {verifier} | {int(total)} | {justified/max(1,total)*100:.1f}% | {unjustified/max(1,total)*100:.1f}% | {inconclusive/max(1,total)*100:.1f}% |\n")
+            f.write("\n")
+        else:
+            f.write("*(No fuzzing data available — code_overrides file not found or empty)*\n\n")
 
         f.write("\n## 7. Domain-Specific Validity Checks\n")
         f.write("*These checks are diagnostic safeguards around domain-specific grading. They support the shared metrics above; they do not replace the common accuracy/FPR/FNR analysis.*\n\n")
@@ -789,14 +956,14 @@ def main():
     graded, science_audit_df = load_and_grade(args)
     
     print("Loading fuzzer override results...")
-    fuzz_dict = load_fuzz_results(args)
+    fuzz_dict, fuzz_rows = load_fuzz_results(args)
     
     print("Analyzing verifications...")
     df, fuzz_errors_removed = analyze_verifications(args, graded, fuzz_dict)
     
     if not df.empty:
         print("Generating reports and plots...")
-        generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df)
+        generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df, fuzz_rows)
     else:
         print("No verified data found to report on.")
 

@@ -122,33 +122,6 @@
 - **other + cot**: 351.5
 - **neutral + cot**: 350.7
 
-## 4. Dissociation Rates (Hallucinated Verdicts)
-### Overall Average Across Everything
-- **Overall**: 14.9%
-### By Domain
-- **Science**: 14.9%
-### By Strategy
-- **cot**: 14.5%
-- **rubric**: 15.2%
-### By Ownership Frame
-- **neutral**: 14.6%
-- **other**: 14.7%
-- **self**: 15.3%
-### By Model
-- **deepseek**: 18.8%
-- **llama**: 17.6%
-- **mistral**: 6.4%
-- **qwen**: 16.8%
-### Top 3 Best Ownership + Strategy Combos
-- **neutral + cot**: 14.0%
-- **other + cot**: 14.6%
-- **other + rubric**: 14.8%
-
-### Dissociation Deep Dive (Reasoning vs Label)
-Out of 2142 hallucinated verifications:
-- **Label was Right / Reasoning was Wrong**: 65.3% of the time.
-- **Reasoning was Right / Label was Wrong**: 34.7% of the time.
-
 ## 5. Verifier Behavior Rates
 ### Overall Averages
 - **Overall** -> Caught: 41.9% | Passed: 58.1% | Introduced: 23.6% | Confirmed: 76.4%
@@ -185,11 +158,89 @@ Out of 2142 hallucinated verifications:
 - **llama** (science, cot): **+4.2%** bias
 - **qwen** (science, cot): **+1.9%** bias
 
-### Statistical Significance (P-Values for Bias)
-*Chi-Square tests on raw False Positives/Negatives between Self and Other frames, computed PER (verifier, domain, strategy) cell - i.e. each p-value tests the exact same slice of data as the bias row above it. Small pilot sample sizes (~20/cell) mean most will read as not significant; that's expected at this scale, not a null result.*
+### Statistical Significance (P-Values for Bias) — Raw numbers, chi-square per (verifier, domain, strategy) cell.
+*Small pilot sample sizes (~20/cell) mean most will read as not significant; that's expected at this scale.*
 - **deepseek** (science, cot): FPR Bias p=0.4658 | FNR Bias p=1.0000
 - **mistral** (science, rubric): FPR Bias p=0.6076 | FNR Bias p=0.0335
 - **qwen** (science, cot): FPR Bias p=0.6400 | FNR Bias p=0.6823
+
+## 6b. Statistical Bias — Fuzz-Adjusted (Corrected Ground Truth)
+*Same analysis as Section 6 but using fuzz-adjusted ground truth for the code domain. Rows where the fuzzer found a `REFERENCE_BUG` (reference was wrong) or `BUG_CONFIRMED` (candidate had a real bug) are reclassified before computing FPR/FNR. For math and science domains the adjusted numbers are identical to raw. Differences between raw and adjusted in code domain reflect the impact of oracle corrections.*
+
+### Top 3 Highest Adjusted Self-Preservation Biases (Adj FPR Gap)
+![Adj FPR Bias Plot](../../../plots/actual/science/actual_science_adj_fpr_self_bias.png)
+
+- **deepseek** (science, cot): **+3.0%** adjusted bias
+- **mistral** (science, rubric): **+2.1%** adjusted bias
+- **qwen** (science, cot): **+2.1%** adjusted bias
+
+### Top 3 Highest Adjusted Self-Doubt Biases (Adj FNR Gap)
+![Adj FNR Bias Plot](../../../plots/actual/science/actual_science_adj_fnr_self_bias.png)
+
+- **llama** (science, rubric): **+4.9%** adjusted bias
+- **llama** (science, cot): **+4.2%** adjusted bias
+- **qwen** (science, cot): **+1.9%** adjusted bias
+
+### Statistical Significance (P-Values for Adjusted Bias)
+- **deepseek** (science, cot): Adj FPR Bias p=0.4658 | Adj FNR Bias p=1.0000
+- **mistral** (science, rubric): Adj FPR Bias p=0.6076 | Adj FNR Bias p=0.0335
+- **qwen** (science, cot): Adj FPR Bias p=0.6400 | Adj FNR Bias p=0.6823
+
+Full adjusted bias table: `actual_science_adj_bias_metrics.csv`.
+
+## 6c. Oracle & Fuzzing Statistics (Code Domain)
+*These rows represent code verifications where the verifier overrode a passing execution result (i.e. test passed but verifier said incorrect). The fuzzer ran differential testing on each and an LLM oracle adjudicated mismatches. This section quantifies how often the verifier was right vs. wrong, and how often the benchmark reference itself was the problem.*
+
+**Total override cases fuzzed:** 1856
+
+### Verdict Breakdown
+
+| Verdict | Count | % of Fuzzed |
+|---|---|---|
+| `BUG_CONFIRMED` | 167 | 9.0% |
+| `REFERENCE_BUG` | 15 | 0.8% |
+| `NO_DISCREPANCY` | 1430 | 77.0% |
+| `SKIPPED_PIPELINE_FAIL` | 168 | 9.1% |
+
+### REFERENCE_BUG Deep Dive (15 cases)
+*These are items where the HumanEval+ reference solution itself appears to be incorrect. The verifier's override was justified — the candidate was actually more correct than the reference.*
+
+**Affected item IDs:** code_HumanEval_126, code_HumanEval_134, code_HumanEval_17, code_HumanEval_59, code_HumanEval_78
+
+**By generator model (which model's candidate was vindicated):**
+- qwen: 8
+- deepseek: 5
+- mistral: 1
+- llama: 1
+
+### Verdicts by Verifier Model
+
+| Verifier | BUG_CONFIRMED | REFERENCE_BUG | NO_DISCREPANCY | SKIPPED_PIPELINE_FAIL |
+|---|---|---|---|---|
+| deepseek | 9 | 3 | 137 | 10 |
+| llama | 25 | 0 | 206 | 18 |
+| mistral | 129 | 12 | 1018 | 132 |
+| qwen | 4 | 0 | 69 | 8 |
+
+### Verdicts by Generator Model
+
+| Generator | BUG_CONFIRMED | REFERENCE_BUG | NO_DISCREPANCY | SKIPPED_PIPELINE_FAIL |
+|---|---|---|---|---|
+| deepseek | 41 | 5 | 436 | 40 |
+| llama | 62 | 1 | 279 | 50 |
+| mistral | 17 | 1 | 322 | 17 |
+| qwen | 47 | 8 | 393 | 61 |
+
+### Verifier Override Accuracy
+*% of overrides that were JUSTIFIED (BUG_CONFIRMED) vs. UNJUSTIFIED (NO_DISCREPANCY or REFERENCE_BUG)*
+
+| Verifier | Total Overrides | Justified (%) | Unjustified (%) | Inconclusive (%) |
+|---|---|---|---|---|
+| deepseek | 159 | 5.7% | 88.1% | 6.3% |
+| llama | 249 | 10.0% | 82.7% | 7.2% |
+| mistral | 1291 | 10.0% | 79.8% | 10.2% |
+| qwen | 81 | 4.9% | 85.2% | 9.9% |
+
 
 ## 7. Domain-Specific Validity Checks
 *These checks are diagnostic safeguards around domain-specific grading. They support the shared metrics above; they do not replace the common accuracy/FPR/FNR analysis.*
