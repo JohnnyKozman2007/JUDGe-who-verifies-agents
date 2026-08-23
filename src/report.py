@@ -308,9 +308,10 @@ def analyze_verifications(args, graded_candidates, fuzz_dict):
                     key = (item_id, gen_model, ver_model, frame, strategy)
                     fuzz_verdict = fuzz_dict.get(key)
                 
-                if fuzz_verdict == "ERROR":
+                if fuzz_verdict in ("ERROR", "SKIPPED_PIPELINE_FAIL"):
                     fuzz_errors_removed += 1
-                    continue
+                    # We no longer `continue` here! If the pipeline fails, we fall back to the basic test result.
+                    pass
                     
                 if fuzz_verdict == "BUG_CONFIRMED":
                     adjusted_cand_is_correct = False
@@ -328,22 +329,6 @@ def analyze_verifications(args, graded_candidates, fuzz_dict):
                         verdict_recovered_from_raw = True
                 thinking = v.get('thinking_or_evaluation', '')
                 verbosity = len(thinking) if thinking else 0
-                
-                dissociated = False
-                label_was_right = False
-                reasoning_was_right = False
-                
-                if strategy != 'direct' and thinking and parsed is not None:
-                    # Use word-boundary regex to avoid substring false alarms, and negative lookbehinds for "no/not"
-                    has_negative = bool(re.search(r'(?<!no )(?<!not )\b(error|fail|fails|incorrect|issue|bug|wrong)\b', thinking, re.IGNORECASE))
-                    has_positive = bool(re.search(r'(?<!no )(?<!not )\b(correct|valid|sound|perfect)\b', thinking, re.IGNORECASE))
-                    
-                    if (parsed is True and has_negative) or (parsed is False and has_positive and not has_negative):
-                        dissociated = True
-                        if parsed == cand_is_correct:
-                            label_was_right = True
-                        else:
-                            reasoning_was_right = True
                 
                 if parsed is None:
                     # Unparseable verdict: exclude from confusion matrix entirely
@@ -405,9 +390,6 @@ def analyze_verifications(args, graded_candidates, fuzz_dict):
                     'adj_fn': int(adj_fn),
                     'latency': v.get('latency', 0),
                     'verbosity': verbosity,
-                    'dissociated': int(dissociated),
-                    'label_was_right': int(label_was_right),
-                    'reasoning_was_right': int(reasoning_was_right),
                     'overrode_passing_tests': int(v.get('overrode_passing_tests', False))
                 })
     return pd.DataFrame(rows), fuzz_errors_removed
@@ -514,7 +496,6 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
         TP=('tp', 'sum'), FP=('fp', 'sum'), TN=('tn', 'sum'), FN=('fn', 'sum'),
         Adj_TP=('adj_tp', 'sum'), Adj_FP=('adj_fp', 'sum'), Adj_TN=('adj_tn', 'sum'), Adj_FN=('adj_fn', 'sum'),
         Avg_Latency=('latency', 'mean'), Avg_Verbosity=('verbosity', 'mean'),
-        Dissociated=('dissociated', 'sum'),
         Formatting_Fails=('formatting_fail', 'sum'),
         Overrode_Passing_Tests=('overrode_passing_tests', 'sum')
     ).reset_index()
@@ -524,7 +505,6 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
     agg['Adjusted_Accuracy'] = (agg['Adj_TP'] + agg['Adj_TN']) / agg['Valid_Total']
     agg['FPR'] = agg['FP'] / (agg['FP'] + agg['TN']).replace(0, 1)
     agg['FNR'] = agg['FN'] / (agg['FN'] + agg['TP']).replace(0, 1)
-    agg['Dissociation_Rate'] = agg['Dissociated'] / agg['Total']
     agg['Formatting_Failure_Rate'] = agg['Formatting_Fails'] / agg['Total']
     
     # Behavior Rates Export
@@ -540,11 +520,9 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
     domain_validity_df = agg.groupby('domain').agg(
         Total=('Total', 'sum'),
         Formatting_Fails=('Formatting_Fails', 'sum'),
-        Dissociated=('Dissociated', 'sum'),
         Code_Overrode_Passing_Tests=('Overrode_Passing_Tests', 'sum')
     ).reset_index()
     domain_validity_df['Formatting_Failure_Rate'] = domain_validity_df['Formatting_Fails'] / domain_validity_df['Total'].clip(lower=1)
-    domain_validity_df['Dissociation_Rate'] = domain_validity_df['Dissociated'] / domain_validity_df['Total'].clip(lower=1)
     domain_validity_df['Science_Candidate_Parse_Rate'] = None
     domain_validity_df['Science_Candidate_Ambiguous_Rate'] = None
 
@@ -559,7 +537,6 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
             Candidate_Ambiguous=('candidate_answer_ambiguous', 'sum'),
             Avg_Latency=('latency', 'mean'),
             Avg_Verbosity=('verbosity', 'mean'),
-            Dissociated=('dissociated', 'sum')
         ).reset_index()
         science_diag['Valid_Total'] = (science_diag['Total'] - science_diag['Formatting_Fails']).clip(lower=1)
         science_diag['Accuracy'] = (science_diag['TP'] + science_diag['TN']) / science_diag['Valid_Total']
@@ -567,7 +544,6 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
         science_diag['FNR'] = science_diag['FN'] / (science_diag['FN'] + science_diag['TP']).replace(0, 1)
         science_diag['Candidate_Parse_Rate'] = science_diag['Candidate_Parsed'] / science_diag['Total'].clip(lower=1)
         science_diag['Candidate_Ambiguous_Rate'] = science_diag['Candidate_Ambiguous'] / science_diag['Total'].clip(lower=1)
-        science_diag['Dissociation_Rate'] = science_diag['Dissociated'] / science_diag['Total'].clip(lower=1)
         science_diag.to_csv(os.path.join(out_dir, f'{prefix}science_verifier_diagnostics.csv'), index=False)
 
         science_mask = domain_validity_df['domain'] == 'science'
@@ -662,7 +638,7 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
         f.write("# Dynamic Executive Summary\n\n")
         f.write(f"**Total Verifications Processed:** {agg['Total'].sum()}\n")
         if fuzz_errors_removed > 0:
-            f.write(f"**Fuzzer Errors Removed:** {fuzz_errors_removed} (These were safely dropped from all metrics)\n\n")
+            f.write(f"**Pipeline Failures Handled:** {fuzz_errors_removed} (These defaulted to basic test suite results rather than dropping rows)\n\n")
         else:
             f.write("\n")
         
@@ -701,18 +677,6 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
         write_breakdown_section(f, "2. Formatting Failure Rates (NaN / Instructions Missed)", agg, 'Formatting_Failure_Rate', is_percent=True, invert_good=True)
         write_breakdown_section(f, "3. Verbosity Analysis (Average Characters)", agg, 'Avg_Verbosity', is_percent=False, invert_good=False)
         
-        non_direct = agg[agg['strategy'] != 'direct']
-        if not non_direct.empty:
-            write_breakdown_section(f, "4. Dissociation Rates (Hallucinated Verdicts)", non_direct, 'Dissociation_Rate', is_percent=True, invert_good=True)
-            f.write("\n### Dissociation Deep Dive (Reasoning vs Label)\n")
-            diss_df = df[df['dissociated'] == 1]
-            if not diss_df.empty:
-                total_diss = len(diss_df)
-                label_right = diss_df['label_was_right'].sum()
-                reasoning_right = diss_df['reasoning_was_right'].sum()
-                f.write(f"Out of {total_diss} hallucinated verifications:\n")
-                f.write(f"- **Label was Right / Reasoning was Wrong**: {label_right/total_diss*100:.1f}% of the time.\n")
-                f.write(f"- **Reasoning was Right / Label was Wrong**: {reasoning_right/total_diss*100:.1f}% of the time.\n")
 
         f.write("\n## 5. Verifier Behavior Rates\n")
         write_behavior_breakdown(f, "Overall Averages", df)

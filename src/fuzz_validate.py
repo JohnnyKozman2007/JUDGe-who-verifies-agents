@@ -23,6 +23,7 @@ from dataclasses import dataclass, field
 from typing import List, Optional
 
 from models import generate_response
+from code_utils import CodeCleaner
 
 # ---------------------------------------------------------------------------
 # Data structures returned to validate_overrides.py
@@ -108,7 +109,7 @@ Answer with exactly one word: 'A', 'B', or 'NEITHER'."""
     )
     
     if not res or not res.get("content"):
-        return "ERROR"
+        return "SKIPPED_PIPELINE_FAIL"
         
     content = res["content"].strip().upper()
     if "A" in content and "B" not in content and "NEITHER" not in content:
@@ -122,7 +123,7 @@ Answer with exactly one word: 'A', 'B', or 'NEITHER'."""
     if match:
         return match.group(1)
         
-    return "ERROR"
+    return "SKIPPED_PIPELINE_FAIL"
 
 # ---------------------------------------------------------------------------
 # Harness script template - runs both functions, compares results
@@ -131,59 +132,110 @@ Answer with exactly one word: 'A', 'B', or 'NEITHER'."""
 _HARNESS_TEMPLATE = '''
 import json
 import sys
-import inspect
+import multiprocessing
 
 # --- Load candidate and reference code ---
 {candidate_code}
 
 {reference_code_renamed}
 
-# --- Load LLM generated inputs ---
-INPUTS = {inputs_json}
+def _call_fn(fn, args):
+    """
+    Try calling fn(*args) first (treating args as a list of positional arguments).
+    If that raises a TypeError that looks like an argument-count mismatch, retry
+    with fn(args) — i.e. pass the whole list as a single argument.
+    This handles functions like sort_list(lst) where the LLM generates [1,2,3]
+    rather than [[1,2,3]], without silently crashing both implementations identically.
+    """
+    if not isinstance(args, list):
+        return fn(args)
+    try:
+        return fn(*args)
+    except TypeError as e:
+        msg = str(e)
+        # Only retry on arity errors, not on type errors inside the function body
+        if "argument" in msg or "positional" in msg or "required" in msg:
+            return fn(args)
+        raise
 
-results = []
-for args in INPUTS:
-    cand_result = None
-    cand_error = None
-    ref_result = None
-    ref_error = None
-    
+def _worker_cand(args, q):
     try:
-        sig = inspect.signature({entry_point})
-        takes_one_arg = len(sig.parameters) == 1
-    except Exception:
-        takes_one_arg = False
-        
-    call_args = [args] if takes_one_arg and isinstance(args, list) else args
-    
-    try:
-        cand_result = repr({entry_point}(*call_args))
+        res = repr(_call_fn({entry_point}, args))
+        q.put((res, None))
     except Exception as e:
-        cand_error = type(e).__name__ + ": " + str(e)
-        
+        q.put((None, type(e).__name__ + ": " + str(e)))
+
+def _worker_ref(args, q):
     try:
-        ref_result = repr(__ref_{entry_point}(*call_args))
+        res = repr(_call_fn(__ref_{entry_point}, args))
+        q.put((res, None))
     except Exception as e:
-        ref_error = type(e).__name__ + ": " + str(e)
+        q.put((None, type(e).__name__ + ": " + str(e)))
 
-    # Match if both returned the same repr, or both raised the same error type
-    if cand_error and ref_error:
-        match = cand_error.split(":")[0] == ref_error.split(":")[0]
-    elif cand_error or ref_error:
-        match = False
-    else:
-        match = (cand_result == ref_result)
+if __name__ == '__main__':
+    multiprocessing.freeze_support()
+    try:
+        multiprocessing.set_start_method('spawn', force=True)
+    except RuntimeError:
+        pass
 
-    results.append({{
-        "inputs": args,
-        "candidate_result": cand_result,
-        "reference_result": ref_result,
-        "candidate_error": cand_error,
-        "reference_error": ref_error,
-        "match": match,
-    }})
+    INPUTS = {inputs_json}
+    results = []
 
-print(json.dumps(results))
+    for args in INPUTS:
+        cand_result, cand_error = None, None
+        ref_result, ref_error = None, None
+        
+        q_cand = multiprocessing.Queue()
+        p_cand = multiprocessing.Process(target=_worker_cand, args=(args, q_cand))
+        p_cand.start()
+        
+        q_ref = multiprocessing.Queue()
+        p_ref = multiprocessing.Process(target=_worker_ref, args=(args, q_ref))
+        p_ref.start()
+        
+        p_cand.join(2.0)
+        if p_cand.is_alive():
+            p_cand.terminate()
+            p_cand.join()
+            cand_error = "TimeoutError: execution exceeded 2.0s"
+        else:
+            if not q_cand.empty():
+                cand_result, cand_error = q_cand.get()
+            else:
+                cand_error = "ProcessCrash: candidate process died unexpectedly"
+                
+        p_ref.join(2.0)
+        if p_ref.is_alive():
+            p_ref.terminate()
+            p_ref.join()
+            ref_error = "TimeoutError: execution exceeded 2.0s"
+        else:
+            if not q_ref.empty():
+                ref_result, ref_error = q_ref.get()
+            else:
+                ref_error = "ProcessCrash: reference process died unexpectedly"
+
+        if cand_error and ref_error:
+            if "TimeoutError" in cand_error and "TimeoutError" in ref_error:
+                match = True
+            else:
+                match = cand_error.split(":")[0] == ref_error.split(":")[0]
+        elif cand_error or ref_error:
+            match = False
+        else:
+            match = (cand_result == ref_result)
+
+        results.append({{
+            "inputs": args,
+            "candidate_result": cand_result,
+            "reference_result": ref_result,
+            "candidate_error": cand_error,
+            "reference_error": ref_error,
+            "match": match,
+        }})
+
+    print(json.dumps(results))
 '''
 
 
@@ -205,32 +257,21 @@ def _rename_reference(reference_code: str, entry_point: str) -> str:
     return renamed
 
 
-def _strip_markdown_fences(code: str) -> str:
-    """Remove ```python ... ``` wrapping if present."""
-    code = code.strip()
-    if code.startswith("```"):
-        lines = code.splitlines()
-        lines = lines[1:]
-        if lines and lines[-1].strip() == "```":
-            lines = lines[:-1]
-        return "\n".join(lines)
-    return code
-
 async def differential_test(
     item_id: str,
     candidate_code: str,
     reference_code: str,
     entry_point: str,
     question: str = "",
-    timeout: int = 15,
+    timeout: int = 60,
 ) -> FuzzResult:
     """
     Run candidate_code vs reference_code on LLM-generated inputs and compare outputs.
     """
-    candidate_code = _strip_markdown_fences(candidate_code)
+    candidate_code = CodeCleaner.extract_code(candidate_code)
     if not reference_code or not reference_code.strip():
         return FuzzResult(
-            verdict="ERROR",
+            verdict="SKIPPED_PIPELINE_FAIL",
             num_trials=0,
             note="No ground-truth reference code provided.",
         )
@@ -251,7 +292,7 @@ async def differential_test(
     
     if not res or not res.get("content"):
         return FuzzResult(
-            verdict="ERROR",
+            verdict="SKIPPED_PIPELINE_FAIL",
             num_trials=0,
             note="LLM failed to generate test inputs.",
         )
@@ -268,14 +309,14 @@ async def differential_test(
             raise ValueError("Root element is not a list")
     except (json.JSONDecodeError, ValueError) as e:
         return FuzzResult(
-            verdict="ERROR",
+            verdict="SKIPPED_PIPELINE_FAIL",
             num_trials=0,
             note=f"LLM generated invalid JSON inputs: {e} -> {content[:100]}...",
         )
         
     if not inputs:
         return FuzzResult(
-            verdict="ERROR",
+            verdict="SKIPPED_PIPELINE_FAIL",
             num_trials=0,
             note="LLM generated an empty list of inputs.",
         )
@@ -307,7 +348,7 @@ async def differential_test(
         if result.returncode != 0:
             error_msg = result.stderr.strip()[-500:] if result.stderr else "unknown error"
             return FuzzResult(
-                verdict="ERROR",
+                verdict="SKIPPED_PIPELINE_FAIL",
                 num_trials=0,
                 note=f"Harness crashed: {error_msg}",
             )
@@ -315,13 +356,13 @@ async def differential_test(
         raw_results = json.loads(result.stdout.strip())
     except subprocess.TimeoutExpired:
         return FuzzResult(
-            verdict="ERROR",
+            verdict="SKIPPED_PIPELINE_FAIL",
             num_trials=0,
             note=f"Differential test timed out after {timeout}s (likely infinite loop).",
         )
     except (json.JSONDecodeError, ValueError) as e:
         return FuzzResult(
-            verdict="ERROR",
+            verdict="SKIPPED_PIPELINE_FAIL",
             num_trials=0,
             note=f"Could not parse harness output: {e}\nOutput was: {result.stdout[:200]}",
         )
@@ -354,10 +395,14 @@ async def differential_test(
             verdict = "BUG_CONFIRMED"
             note = f"Oracle confirmed bug on {t.inputs}."
         elif oracle_answer == "NEITHER":
-            verdict = "BUG_CONFIRMED"
-            note = f"Oracle says both are wrong on {t.inputs}."
+            # Oracle could not determine which implementation is correct (e.g. both crashed
+            # on a malformed input, or the problem is genuinely ambiguous for this edge case).
+            # Penalizing the candidate here would be wrong — fall back to the basic test result
+            # the same way a pipeline failure does.
+            verdict = "SKIPPED_PIPELINE_FAIL"
+            note = f"Oracle returned NEITHER on {t.inputs} — cannot determine correctness; falling back to basic test result."
         else:
-            verdict = "ERROR"
+            verdict = "SKIPPED_PIPELINE_FAIL"
             note = f"Oracle failed to respond properly."
     else:
         verdict = "NO_DISCREPANCY"

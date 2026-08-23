@@ -22,18 +22,7 @@ import sys
 import re
 from dataclasses import dataclass, asdict
 from typing import Optional
-
-
-def _strip_markdown_fences(code: str) -> str:
-    """Remove ```python ... ``` wrapping if present."""
-    code = code.strip()
-    if code.startswith("```"):
-        lines = code.splitlines()
-        lines = lines[1:]  # drop opening fence
-        if lines and lines[-1].strip() == "```":
-            lines = lines[:-1]  # drop closing fence
-        return "\n".join(lines)
-    return code
+from code_utils import CodeCleaner
 
 
 @dataclass
@@ -115,7 +104,7 @@ def run_candidate_code(candidate_text: str, test_code: str, entry_point: Optiona
     if not candidate_text:
         return ExecutionResult(False, "", "", None, False, None, None)
 
-    candidate_text = _strip_markdown_fences(candidate_text)
+    candidate_text = CodeCleaner.extract_code(candidate_text)
 
     full_source = candidate_text + "\n\n" + test_code
     if entry_point:

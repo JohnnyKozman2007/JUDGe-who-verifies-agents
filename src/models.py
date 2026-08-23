@@ -50,6 +50,12 @@ async def generate_response(model_name: str, messages: list, temperature: float 
                 "latency": latency
             }
         except Exception as e:
+            error_str = str(e).lower()
+            if "balance" in error_str or "funds" in error_str or "402" in error_str or "payment" in error_str:
+                print(f"FATAL API ERROR: Insufficient funds or payment required. {e}")
+                import sys
+                sys.exit(1)
+                
             if attempt == retries:
                 print(f"Failed after {retries} retries for model {model_name}. Error: {e}")
                 return None
