@@ -1,0 +1,9 @@
+Verifier,Domain,Total Cases,Selected OWN (%),Selected OWN (Count),Selected OTHER (%),Selected OTHER (Count),Both Incorrect (%),Both Incorrect (Count),Both Correct (%),Both Correct (Count),Position Bias (%),Position Bias (Count),Inconsistent (%),Inconsistent (Count)
+DEEPSEEK,ALL,608,6.6%,40,3.5%,21,5.1%,31,66.8%,406,3.6%,22,14.5%,88
+DEEPSEEK,CODE,54,16.7%,9,14.8%,8,0.0%,0,35.2%,19,9.3%,5,24.1%,13
+DEEPSEEK,MATH,333,6.0%,20,3.0%,10,0.3%,1,77.8%,259,4.5%,15,8.4%,28
+DEEPSEEK,SCIENCE,221,5.0%,11,1.4%,3,13.6%,30,57.9%,128,0.9%,2,21.3%,47
+QWEN,ALL,608,12.7%,77,7.2%,44,0.2%,1,55.8%,339,10.9%,66,13.3%,81
+QWEN,CODE,54,37.0%,20,11.1%,6,0.0%,0,20.4%,11,22.2%,12,9.3%,5
+QWEN,MATH,333,10.2%,34,2.7%,9,0.0%,0,70.9%,236,6.3%,21,9.9%,33
+QWEN,SCIENCE,221,10.4%,23,13.1%,29,0.5%,1,41.6%,92,14.9%,33,19.5%,43
