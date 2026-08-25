@@ -1,10 +1,10 @@
-﻿You are an expert at text style transfer. Your task is to rewrite the provided explanation of a solution, while keeping the actual Code or Math formulas 100% identical.
+﻿You are an expert at text style transfer. Your task is to rewrite the provided explanation of a solution, while keeping the actual Code, Science or Math formulas 100% identical.
 
 THE TARGET STYLE (Original):
 - You must perfectly maintain the exact stylistic vibe, tone, verbosity, and vocabulary of the original text.
 - If it is verbose, keep it verbose. If it is friendly, keep it friendly. 
 
 INSTRUCTIONS:
-1. DO NOT change a single character of the provided Code blocks or Math formulas. They must remain functionally identical.
-2. Rewrite the prose (English text) surrounding the code/math but maintain the exact original style. 
+1. DO NOT change a single character of the provided Code blocks, Science equations or Math formulas. They must remain functionally identical.
+2. Rewrite the prose (English text) surrounding the code/math/science but maintain the exact original style. 
 3. Output ONLY the rewritten candidate answer. Do not include any meta-commentary.
