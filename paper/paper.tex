@@ -40,7 +40,7 @@
 %  \usepackage[dblblindworkshop, final]{neurips_2026}
 % Note. For the workshop paper template, both \title{} and \workshoptitle{} are required, with the former indicating the paper title shown in the title and the latter indicating the workshop title displayed in the footnote.
 % For workshops (5., 6.), the authors should add the name of the workshop, "\workshoptitle" command is used to set the workshop title.
-\workshoptitle{JUDGe: Can We Trust the Judge? Building Reliable Evaluation for Language Models (NeurIPS 2026)}
+\workshoptitle{Who Verifies the Agents? Toward Reliable Agent Development}
 % 7. Education Track
 % \usepackage[education, final]{neurips_2026}
 
@@ -63,7 +63,10 @@
 \usepackage{graphicx}
 
 % Note. For the workshop paper template, both \title{} and \workshoptitle{} are required, with the former indicating the paper title shown in the title and the latter indicating the workshop title displayed in the footnote. 
-\title{Grounding, Not Framing: What Actually Breaks LLM Judges}
+\graphicspath{{../plots/}{plots/}{./}}
+
+\title{Agreement Is Not Verification:\\
+Why LLM Judges Need the Environment, Not Each Other}
 
 
 % The \author macro works with any number of authors. There are two commands
@@ -97,41 +100,188 @@
 
 \begin{abstract}
   %The abstract paragraph should be indented \nicefrac{1}{2}~inch (3~picas) on both the left- and right-hand margins. Use 10~point type, with a vertical spacing (leading) of 11~points. The word \textbf{Abstract} must be centered, bold, and in point size 12. Two line spaces precede the abstract. The abstract must be limited to one paragraph.%
-Work on LLM-as-a-judge reliability has focused heavily on \emph{self-preference}: the worry
-that a model shown its own output will favour it. We ran a 64,800-verification factorial
-experiment (4 models as both generators and verifiers $\times$ 3 authorship frames $\times$ 3
-verification strategies $\times$ 3 domains) and find that the framing story is a null. Telling
-a judge ``you wrote this'' moves its false-positive rate by $-0.6$pp on average
-(mean $|\Delta| = 2.3$pp, Wilcoxon $p = 0.45$ over 36 cells); a causal style-transfer probe
-that rewrites answers into another model's prose changes it by $\le 1.5$pp; and a
-1,800-item self-recognition probe shows that apparent self-recognition is conclusion-matching,
-with 11 of 12 model$\times$domain cells failing to beat a conclusion-matched baseline after
-correction. What does move judgments is a variable unrelated to authorship labels: whether the
-domain affords an \emph{external oracle}. Without grounding, three failure modes appear
-together. (i) Stronger generators produce systematically less detectable errors
-(item-stratified $r = {+}0.53$ science, ${+}0.48$ math, both permutation $p = 0.0005$), and no
-prompting strategy mitigates it. (ii) Judges fail together rather than independently
-(unanimous wrong-answer approval $2.9\times$ and $1.8\times$ above an independence null;
-mean $\kappa = {+}0.36$/${+}0.45$), so cross-validated ensembling yields no reliable gain.
-(iii) Error-catch rate, the standard judge metric, inverts the true ranking. Under execution
-grounding all three abate: the detectability gradient is not significant ($p = 0.064$), judge
-errors decorrelate ($\kappa = {+}0.09$, no excess unanimity), and ensembling gains
-${+}6.1$pp balanced accuracy (95\% CI $[{+}1.9, {+}11.1]$). We argue that judge reliability
-is a property of the evaluation \emph{environment}, not of the judge, and that
-self-preference audits are measuring the wrong variable.
+  Agent pipelines increasingly close the loop with an LLM verifier: one model judges
+  whether another's output is correct, and that judgment gates deployment, training, or
+  search. We report a controlled study of that judgment across 64{,}800 verification
+  calls, crossing four models as both generators and verifiers with three authorship
+  frames and three verification strategies over three task domains. Two fixes commonly
+  proposed for unreliable LLM judges both fail. The first is to blind the judge to
+  authorship. Self-preference is real, but it is not about the self: telling a model it
+  wrote an answer changes nothing, while a model that genuinely wrote it approves its own
+  errors 12 percentage points more often. Nor is that gap self-recognition---rewriting an
+  answer into another model's prose leaves the verdict unmoved, and in 9 of 12
+  model$\times$domain cells what looks like recognition is a model agreeing with its own
+  earlier conclusion rather than identifying its own writing. Self-preference is belief
+  persistence, so blinding cannot remove it. The second fix is a better or larger panel.
+  Errors from stronger generators are systematically harder to catch---the same direction
+  in all three domains---and no verification strategy narrows the gap; where the task
+  admits no executable check, judges fail together rather than independently, so adding
+  judges buys nothing. Only an environment signal changes the picture, and even then
+  judges contradict that signal on one call in eight, with differential testing supporting
+  fewer than one in ten of those contradictions. The binding constraint on agent
+  verification is the signal the environment can supply, not the model reading it.
+\end{abstract}
 
 \section{Introduction}
 \label{Introduction}
 
-Large language models are increasingly used as judges: they grade benchmark answers, review agent outputs, monitor safety behavior, and provide feedback in self-refinement and multi-agent workflows. These uses often treat the verifier as a neutral proxy for correctness. Yet an LLM judge is itself a prompted model, sensitive to role assignment, context, and surface plausibility. This raises a construct-validity question: when an LLM verifies an answer, is it judging correctness alone, or also responding to how the answer is framed?
+Language models are increasingly asked to check other models' work. An LLM verifier
+decides whether a candidate answer is correct, and that decision is load-bearing: it
+filters training data, scores rollouts under AI feedback, gates a step in an agent's plan,
+and closes the loop in self-refinement
+pipelines~\citep{zheng2023judging,bai2022constitutional,madaan2023selfrefine}. The
+verifier stands in for a correctness oracle that is too slow or simply unavailable, and
+whether that substitution is safe depends on a property verifiers are rarely tested for:
+that the verdict tracks correctness, and nothing else.
 
-We study one simple framing variable: perceived authorship. In agentic systems, a verifier may be asked to check its own prior answer, another model's answer, or an unattributed answer. These cases are often grouped together as LLM-as-a-judge evaluation, but they may not induce the same behavior. A model told ``you wrote this answer'' may approve, reject, or rationalize differently than the same model judging the same answer under another-author or neutral framing.
+It does not. A verifier is itself a prompted model, sensitive to who it is told wrote an
+answer, to how the answer is phrased, and to whether the answer agrees with what it would
+have said~\citep{zheng2023judging,wang2023fair,panickssery2024llm}. Practice has converged
+on two fixes. The first treats self-preference as a conflict of interest: blind the judge
+to authorship, or never let a model grade its own output. The second treats unreliability
+as noise: use a stronger judge, a better prompt, or a panel of
+judges~\citep{verga2024replacing}. Neither has been tested under a design that separates
+what a judge \emph{believes} about authorship from who actually wrote the text, or that
+holds a specific error fixed while varying the judge that sees it.
 
-We test this with a controlled generator-verifier experiment across math, code, and science tasks. Four models, Qwen2.5-72B-Instruct, DeepSeek-V3, Llama-3.3-70B-Instruct-Turbo, and Mistral-Nemo-Instruct-2407, first generate candidate answers. The same models then verify each answer under three authorship frames: self, other, and neutral. We also vary the verification strategy: direct judgment, brief chain-of-thought evaluation, and rubric-based evaluation. Because the told frame is crossed with the true generator-verifier identity, we can separate belief effects caused by authorship labels from actual self-verification effects.
+We run that design. Four instruction-tuned models---Qwen2.5-72B, DeepSeek-V3,
+Llama-3.3-70B and Mistral-Nemo-12B---each answer every item, and all four then verify
+every candidate under three authorship frames (told it is their own, told it is another
+model's, told nothing) crossed with three strategies (verdict only, brief chain of
+thought, rubric). Crossing the told frame with the true generator--verifier identity
+separates the belief of authorship from the fact of it; having every judge see every
+candidate lets us hold a specific wrong answer fixed and ask which judges catch it,
+removing item difficulty as a confound by construction rather than by adjustment. The
+three domains vary one property deliberately---whether the environment can supply an
+independent check. Code admits execution against tests, mathematics admits answer
+matching, graduate-level science admits neither. In total, 64{,}800 verification calls
+over 450 items.
 
-We evaluate verifier accuracy, false-positive and false-negative rates, formatting failures, reasoning-verdict dissociation, and belief-vs-reality gaps between told and true authorship. Science is a central stress test: unlike code, where execution can provide grounding, or math, where final answers are often easier to check, science questions can make incorrect answers sound technically plausible. In our pilot, science shows the weakest verification performance and especially high false approvals of incorrect answers.
+Self-preference survives the intervention aimed at it, because that intervention targets
+the wrong mechanism. Telling a model it wrote an answer moves false approval by under a
+percentage point, in the direction opposite to self-preference, while a model that
+\emph{actually} wrote the answer approves its own errors twelve points more often, holding
+the error fixed. Nor is that gap self-recognition: rewriting an answer into another
+model's prose, against a placebo rewrite, leaves the verdict unmoved, and in almost every
+model and domain we test, apparent recognition dissolves once we control for the model
+agreeing with the conclusion it originally reached. This runs against
+\citet{panickssery2024llm}, where self-recognition drives self-preference. The mechanism we
+find is belief persistence---a model that still holds a conclusion approves any answer
+expressing it---so blinding a judge to authorship cannot remove a bias that does not run
+through authorship.
 
-Our contributions are threefold. First, we introduce a controlled protocol for measuring authorship framing bias in LLM verification. Second, we distinguish told authorship from actual authorship through a belief-vs-reality analysis. Third, we provide a multi-domain study showing that verifier reliability depends strongly on task domain and prompting strategy. Overall, our results suggest that LLM judges should be treated not as passive correctness oracles, but as context-sensitive agents whose judgments can shift under authorship framing.
+The remaining unreliability is structural rather than correctable by better judging.
+Errors from stronger generators are systematically harder to catch, in the same direction
+in all three domains, and no strategy narrows the gap; where no mechanical check exists,
+judges fail together rather than independently, so a panel inherits a shared blind spot
+instead of averaging it away. What changes the picture is a signal from the environment
+rather than a better model reading the answer: judge accuracy runs at 87.5\% where the
+judge is shown an execution result, against 57\% to 65\% where it must judge unaided, and
+the correlation between judges' errors disappears in the grounded case. Even then the
+judge is not the source of that reliability---it contradicts the runtime result on one
+call in eight, and independent differential testing supports fewer than one in ten of
+those contradictions.
+
+\paragraph{Contributions.}
+(i) A protocol separating believed from actual authorship, with an error-stratified
+estimator that holds the specific error fixed across judges. (ii) Three probes---style
+transfer, structural preference, and self-recognition with a consistency control---that
+jointly rule out self-recognition as the mechanism behind self-preference. (iii) Evidence
+that error detectability falls with generator strength and that judge failures are
+correlated, which together explain why stronger judges, better prompts and larger panels
+all fail on ungrounded tasks. (iv) Evidence that the binding constraint on agent
+verification is the signal the environment supplies, not the judge reading it. We release
+all prompts, code, and the 64{,}800 verification traces.
+
+\paragraph{Related work.}
+LLM-as-a-judge evaluation is now standard practice, alongside a catalogue of its failure
+modes: position and verbosity bias~\citep{zheng2023judging,wang2023fair}, and a preference
+for a model's own generations that has been attributed to
+self-recognition~\citep{panickssery2024llm}. Proposed remedies include stronger or more
+numerous judges~\citep{verga2024replacing} and richer prompting. A parallel line finds that
+models cannot reliably correct their own reasoning without external
+feedback~\citep{huang2024selfcorrect}, and that execution- or process-level signals
+substantially improve verification~\citep{liu2023evalplus,lightman2024verify}. We differ in
+three ways: we separate believed from actual authorship rather than confounding them; we
+test the self-recognition account against a consistency control; and we vary the
+availability of an environment signal while holding the judge pool fixed, which lets us
+attribute reliability to grounding rather than to judge capability.
+
+\section{Setup and judging system}
+\label{sec:setup}
+
+\paragraph{Tasks.} We draw 150 items from each of three benchmarks with a fixed sampling
+seed: HumanEval+~\citep{liu2023evalplus} for code, MATH~\citep{hendrycks2021math} for
+mathematics, and GPQA-Diamond~\citep{rein2024gpqa} for graduate-level science. The domains
+are chosen not for difficulty but for what the environment can verify, and Table~\ref{tab:domains}
+records the distinction the paper turns on. Correctness is established by running the
+candidate in code, by matching a final answer in mathematics, and by a multiple-choice
+letter in science---but only in code does any of that reach the judge. Mathematics is
+therefore a checkable task presented to an unaided judge, which separates
+\emph{grounding} from \emph{checkability}. Science options are shuffled per item under a
+fixed seed and rendered as A--D; items whose options fail a validity check are discarded
+before sampling.
+
+\begin{table}[t]
+  \caption{The three domains differ in whether a mechanical check exists and, separately,
+  in whether the judge is shown one. Only code verifications receive an environment signal.}
+  \label{tab:domains}
+  \centering
+  \small
+  \begin{tabular}{llll}
+    \toprule
+    Domain & Benchmark & Correctness established by & Signal shown to judge \\
+    \midrule
+    Code    & HumanEval+     & Execution against the test harness      & Execution result block \\
+    Math    & MATH           & Final-answer extraction, numeric match  & None \\
+    Science & GPQA-Diamond   & Option letter; ambiguous parses fail    & None \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\paragraph{Models.} Four instruction-tuned models act as both generators and verifiers:
+Qwen2.5-72B-Instruct, DeepSeek-V3, Llama-3.3-70B-Instruct-Turbo, and
+Mistral-Nemo-Instruct-2407. All are served through a single inference provider at
+temperature~0. The pool deliberately spans a wide capability range, from a 12B dense model
+to a 671B-parameter mixture of experts; \S\ref{sec:results-detect} exploits that spread,
+and \S\ref{sec:limitations} notes it as a confound for any model-level ranking.
+
+\paragraph{The verification grid.} Every model produces a candidate for every item, with
+no generation failures (1{,}800 candidates), and every model then verifies every candidate.
+Each verification varies two factors independently. The \emph{authorship frame} tells the
+judge the answer is its own (\textsc{self}), another model's (\textsc{other}), or says
+nothing (\textsc{neutral}); prompts are identical apart from that single sentence, and no
+model is ever named. The \emph{verification strategy} requests a bare verdict
+(\textsc{direct}), a brief chain of thought before the verdict (\textsc{cot}), or a
+rubric-scored assessment (\textsc{rubric}). This yields $4\times4\times3\times3 = 144$
+verifications per item and 64{,}800 in total.
+
+The design's essential property is that the told frame is crossed with the true
+generator--verifier identity. A judge told ``you wrote this'' is usually being misinformed,
+and a judge told nothing is sometimes grading its own work. Comparing frames at fixed true
+authorship isolates the \emph{belief} of authorship; comparing true authorship at a fixed
+frame isolates the \emph{fact} of it. Section~\ref{sec:results-belief} reports both.
+
+\paragraph{Execution grounding in code.} Code verifications, and only code verifications,
+carry a block reporting what happened when the candidate was actually run against the
+benchmark's harness: exit status, assertion count, captured output, and the final traceback
+frame on failure. The prompt states that this is a signal rather than the final word and
+explicitly permits the judge to mark passing code incorrect on logical grounds. That
+permission is deliberate: it makes judge-initiated deviation from the environment signal
+observable, which \S\ref{sec:results-ground} measures. The harness, its timeouts, and the
+differential fuzzer used to adjudicate disputed overrides are described in
+Appendix~\ref{app:execution}.
+
+\paragraph{Verdicts and metrics.} Verifiers return JSON and a verdict is read from a single
+boolean field, with fallbacks for fenced or prefixed output. Of 64{,}800 calls, 277
+(0.43\%) never yielded a parseable verdict and are dropped; all of them come from the two
+reasoning strategies, and 262 from the smallest model. Approving an incorrect answer is a
+\emph{false approval} and rejecting a correct one a \emph{false rejection}. We report raw
+accuracy for comparability with prior work but treat balanced accuracy as primary: the rate
+at which a judge catches errors is maximised by rejecting everything, and raw accuracy is
+inflated wherever one class dominates---both failure modes we document in
+\S\ref{sec:results-detect}. Items are the independent unit throughout, and every confidence
+interval resamples items rather than verification calls.
 
 % \section{Submission of papers to NeurIPS 2026}
 
