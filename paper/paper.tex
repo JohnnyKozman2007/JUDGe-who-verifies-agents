@@ -61,7 +61,8 @@
 \usepackage{microtype}      % microtypography
 \usepackage{xcolor}         % colors
 \usepackage{graphicx}
-
+\usepackage{float}
+\usepackage{placeins}
 % Note. For the workshop paper template, both \title{} and \workshoptitle{} are required, with the former indicating the paper title shown in the title and the latter indicating the workshop title displayed in the footnote. 
 \graphicspath{{../plots/}{plots/}{./}}
 
@@ -222,7 +223,7 @@ therefore a checkable task presented to an unaided judge, which separates
 fixed seed and rendered as A--D; items whose options fail a validity check are discarded
 before sampling.
 
-\begin{table}[t]
+\begin{table}[H]
   \caption{The three domains differ in whether a mechanical check exists and, separately,
   in whether the judge is shown one. Only code verifications receive an environment signal.}
   \label{tab:domains}
@@ -267,8 +268,7 @@ carry a block reporting what happened when the candidate was actually run agains
 benchmark's harness: exit status, assertion count, captured output, and the final traceback
 frame on failure. The prompt states that this is a signal rather than the final word and
 explicitly permits the judge to mark passing code incorrect on logical grounds. That
-permission is deliberate: it makes judge-initiated deviation from the environment signal
-observable, which \S\ref{sec:results-ground} measures. The harness, its timeouts, and the
+permission is deliberate: it makes judge-initiated deviation from the environment signal observable, which Appendix~\ref{app:execution} measures. The harness, its timeouts, and the
 differential fuzzer used to adjudicate disputed overrides are described in
 Appendix~\ref{app:execution}.
 
@@ -283,380 +283,641 @@ inflated wherever one class dominates---both failure modes we document in
 \S\ref{sec:results-detect}. Items are the independent unit throughout, and every confidence
 interval resamples items rather than verification calls.
 
-% \section{Submission of papers to NeurIPS 2026}
-
-
-% Please read the instructions below carefully and follow them faithfully.
-
-
-% % \subsection{Style}
-
-
-% % Papers to be submitted to NeurIPS 2026 must be prepared according to the
-% % instructions presented here. Papers may only be up to {\bf nine} pages long, including figures. \textbf{Papers that exceed the page limit will not be reviewed (or in any other way considered) for presentation at the conference.}
-% % Additional pages \emph{containing acknowledgments, references, checklist, and optional technical appendices} do not count as content pages. 
-
-
-% % The margins in 2026 are the same as those in previous years.
-
-
-% % Authors are required to use the NeurIPS \LaTeX{} style files obtainable at the NeurIPS website as indicated below. Please make sure you use the current files and not previous versions. Tweaking the style files may be grounds for desk rejection.
-
-
-% % \subsection{Retrieval of style files}
-
-
-% % The style files for NeurIPS and other conference information are available on the website at
-% % \begin{center}
-% %   \url{https://neurips.cc}.
-% % \end{center}
-% % % The file \verb+neurips_2026.pdf+ contains these instructions and illustrates the various formatting requirements your NeurIPS paper must satisfy.
-
-
-% % The only supported style file for NeurIPS 2026 is \verb+neurips_2026.sty+, rewritten for \LaTeXe{}. \textbf{Previous style files for \LaTeX{} 2.09,  Microsoft Word, and RTF are no longer supported.}
-
-
-% % The \LaTeX{} style file contains three optional arguments: 
-% % \begin{itemize}
-% % \item \verb+final+, which creates a camera-ready copy, 
-% % \item \verb+preprint+, which creates a preprint for submission to, e.g., arXiv, \item \verb+nonatbib+, which will not load the \verb+natbib+ package for you in case of package clash.
-% % \end{itemize}
-
-
-% % \paragraph{Preprint option}
-% % If you wish to post a preprint of your work online, e.g., on arXiv, using the NeurIPS style, please use the \verb+preprint+ option. This will create a nonanonymized version of your work with the text ``Preprint. Work in progress.'' in the footer. This version may be distributed as you see fit, as long as you do not say which conference it was submitted to. Please \textbf{do not} use the \verb+final+ option, which should \textbf{only} be used for papers accepted to NeurIPS.
-
-
-% % At submission time, please omit the \verb+final+ and \verb+preprint+ options. This will anonymize your submission and add line numbers to aid review. Please do \emph{not} refer to these line numbers in your paper as they will be removed during generation of camera-ready copies.
-
-
-% % The file \verb+neurips_2026.tex+ may be used as a ``shell'' for writing your paper. All you have to do is replace the author, title, abstract, and text of the paper with your own.
-
-
-% % The formatting instructions contained in these style files are summarized in Sections \ref{gen_inst}, \ref{headings}, and \ref{others} below.
-
-
-% % \section{General formatting instructions}
-% % \label{gen_inst}
-
-
-% % The text must be confined within a rectangle 5.5~inches (33~picas) wide and
-% % 9~inches (54~picas) long. The left margin is 1.5~inch (9~picas).  Use 10~point
-% % type with a vertical spacing (leading) of 11~points.  Times New Roman is the
-% % preferred typeface throughout, and will be selected for you by default.
-% % Paragraphs are separated by \nicefrac{1}{2}~line space (5.5 points), with no
-% % indentation.
-
-
-% % The paper title should be 17~point, initial caps/lower case, bold, centered
-% % between two horizontal rules. The top rule should be 4~points thick and the
-% % bottom rule should be 1~point thick. Allow \nicefrac{1}{4}~inch space above and
-% % below the title to rules. All pages should start at 1~inch (6~picas) from the
-% % top of the page.
-
-
-% % For the final version, authors' names are set in boldface, and each name is
-% % centered above the corresponding address. The lead author's name is to be listed
-% % first (left-most), and the co-authors' names (if different address) are set to
-% % follow. If there is only one co-author, list both author and co-author side by
-% % side.
-
-
-% % Please pay special attention to the instructions in Section \ref{others}
-% % regarding figures, tables, acknowledgments, and references.
-
-% % \section{Headings: first level}
-% % \label{headings}
-
-
-% % All headings should be lower case (except for first word and proper nouns),
-% % flush left, and bold.
-
-
-% % First-level headings should be in 12-point type.
-
-
-% % \subsection{Headings: second level}
-
-
-% % Second-level headings should be in 10-point type.
-
-
-% % \subsubsection{Headings: third level}
-
-
-% % Third-level headings should be in 10-point type.
-
-
-% % \paragraph{Paragraphs}
-
-
-% % There is also a \verb+\paragraph+ command available, which sets the heading in
-% % bold, flush left, and inline with the text, with the heading followed by 1\,em
-% % of space.
-
-
-% % \section{Citations, figures, tables, references}
-% % \label{others}
-
-
-% % These instructions apply to everyone.
-
-
-% % \subsection{Citations within the text}
-
-
-% % The \verb+natbib+ package will be loaded for you by default.  Citations may be
-% % author/year or numeric, as long as you maintain internal consistency.  As to the
-% % format of the references themselves, any style is acceptable as long as it is
-% % used consistently.
-
-
-% % The documentation for \verb+natbib+ may be found at
-% % \begin{center}
-% %   \url{http://mirrors.ctan.org/macros/latex/contrib/natbib/natnotes.pdf}
-% % \end{center}
-% % Of note is the command \verb+\citet+, which produces citations appropriate for
-% % use in inline text.  For example,
-% % \begin{verbatim}
-% %    \citet{hasselmo} investigated\dots
-% % \end{verbatim}
-% % produces
-% % \begin{quote}
-% %   Hasselmo, et al.\ (1995) investigated\dots
-% % \end{quote}
-
-
-% % If you wish to load the \verb+natbib+ package with options, you may add the
-% % following before loading the \verb+neurips_2026+ package:
-% % \begin{verbatim}
-% %    \PassOptionsToPackage{options}{natbib}
-% % \end{verbatim}
-
-
-% % If \verb+natbib+ clashes with another package you load, you can add the optional
-% % argument \verb+nonatbib+ when loading the style file:
-% % \begin{verbatim}
-% %    \usepackage[nonatbib]{neurips_2026}
-% % \end{verbatim}
-
-
-% % As submission is double blind, refer to your own published work in the third
-% % person. That is, use ``In the previous work of Jones et al.\ [4],'' not ``In our
-% % previous work [4].'' If you cite your other papers that are not widely available
-% % (e.g., a journal paper under review), use anonymous author names in the
-% % citation, e.g., an author of the form ``A.\ Anonymous'' and include a copy of the anonymized paper in the supplementary material.
-
-
-% % \subsection{Footnotes}
-
-
-% % Footnotes should be used sparingly.  If you do require a footnote, indicate
-% % footnotes with a number\footnote{Sample of the first footnote.} in the
-% % text. Place the footnotes at the bottom of the page on which they appear.
-% % Precede the footnote with a horizontal rule of 2~inches (12~picas).
-
-
-% % Note that footnotes are properly typeset \emph{after} punctuation
-% % marks.\footnote{As in this example.}
-
-
-% % \subsection{Figures}
-
-
-% % \begin{figure}
-% %   \centering
-% %   \fbox{\rule[-.5cm]{0cm}{4cm} \rule[-.5cm]{4cm}{0cm}}
-% %   \caption{Sample figure caption. Explain what the figure shows and add a key take-away message to the caption.}
-% % \end{figure}
-
-
-% % All artwork must be neat, clean, and legible. Lines should be dark enough for
-% %  reproduction purposes. The figure number and caption always appear after the
-% % figure. Place one line space before the figure caption and one line space after
-% % the figure. The figure caption should be lower case (except for the first word and proper nouns); figures are numbered consecutively.
-
-
-% % You may use color figures.  However, it is best for the figure captions and the
-% % paper body to be legible if the paper is printed in either black/white or in
-% % color.
-
-
-% % \subsection{Tables}
-
-
-% % All tables must be centered, neat, clean, and legible.  The table number and
-% % title always appear before the table.  See Table~\ref{sample-table}.
-
-
-% % Place one line space before the table title, one line space after the
-% % table title, and one line space after the table. The table title must
-% % be lower case (except for the first word and proper nouns); tables are
-% % numbered consecutively.
-
-
-% % Note that publication-quality tables \emph{do not contain vertical rules}. We
-% % strongly suggest the use of the \verb+booktabs+ package, which allows for
-% % typesetting high-quality, professional tables:
-% % \begin{center}
-% %   \url{https://www.ctan.org/pkg/booktabs}
-% % \end{center}
-% % This package was used to typeset Table~\ref{sample-table}.
-
-
-% % \begin{table}
-% %   \caption{Sample table caption. Explain what the table shows and add a key take-away message to the caption.}
-% %   \label{sample-table}
-% %   \centering
-% %   \begin{tabular}{lll}
-% %     \toprule
-% %     \multicolumn{2}{c}{Part}                   \\
-% %     \cmidrule(r){1-2}
-% %     Name     & Description     & Size ($\mu$m) \\
-% %     \midrule
-% %     Dendrite & Input terminal  & $\approx$100     \\
-% %     Axon     & Output terminal & $\approx$10      \\
-% %     Soma     & Cell body       & up to $10^6$  \\
-% %     \bottomrule
-% %   \end{tabular}
-% % \end{table}
-
-% % \subsection{Math}
-% % Note that display math in bare TeX commands will not create correct line numbers for submission. Please use LaTeX (or AMSTeX) commands for unnumbered display math. (You really shouldn't be using \$\$ anyway; see \url{https://tex.stackexchange.com/questions/503/why-is-preferable-to} and \url{https://tex.stackexchange.com/questions/40492/what-are-the-differences-between-align-equation-and-displaymath} for more information.)
-
-% % \subsection{Final instructions}
-
-% % Do not change any aspects of the formatting parameters in the style files.  In
-% % particular, do not modify the width or length of the rectangle the text should
-% % fit into, and do not change font sizes. Please note that pages should be
-% % numbered.
-
-
-% % \section{Preparing PDF files}
-
-
-% % Please prepare submission files with paper size ``US Letter,'' and not, for
-% % example, ``A4.''
-
-
-% % Fonts were the main cause of problems in the past years. Your PDF file must only
-% % contain Type 1 or Embedded TrueType fonts. Here are a few instructions to
-% % achieve this.
-
-
-% % \begin{itemize}
-
-
-% % \item You should directly generate PDF files using \verb+pdflatex+.
-
-
-% % \item You can check which fonts a PDF files uses.  In Acrobat Reader, select the
-% %   menu Files$>$Document Properties$>$Fonts and select Show All Fonts. You can
-% %   also use the program \verb+pdffonts+ which comes with \verb+xpdf+ and is
-% %   available out-of-the-box on most Linux machines.
-
-
-% % \item \verb+xfig+ ``patterned'' shapes are implemented with bitmap fonts.  Use
-% %   "solid" shapes instead.
-
-
-% % \item The \verb+\bbold+ package almost always uses bitmap fonts.  You should use
-% %   the equivalent AMS Fonts:
-% % \begin{verbatim}
-% %    \usepackage{amsfonts}
-% % \end{verbatim}
-% % followed by, e.g., \verb+\mathbb{R}+, \verb+\mathbb{N}+, or \verb+\mathbb{C}+
-% % for $\mathbb{R}$, $\mathbb{N}$ or $\mathbb{C}$.  You can also use the following
-% % workaround for reals, natural and complex:
-% % \begin{verbatim}
-% %    \newcommand{\RR}{I\!\!R} %real numbers
-% %    \newcommand{\Nat}{I\!\!N} %natural numbers
-% %    \newcommand{\CC}{I\!\!\!\!C} %complex numbers
-% % \end{verbatim}
-% % Note that \verb+amsfonts+ is automatically loaded by the \verb+amssymb+ package.
-
-
-% % \end{itemize}
-
-
-% % If your file contains type 3 fonts or non embedded TrueType fonts, we will ask
-% % you to fix it.
-
-
-% % \subsection{Margins in \LaTeX{}}
-
-
-% % Most of the margin problems come from figures positioned by hand using
-% % \verb+\special+ or other commands. We suggest using the command
-% % \verb+\includegraphics+ from the \verb+graphicx+ package. Always specify the
-% % figure width as a multiple of the line width as in the example below:
-% % \begin{verbatim}
-% %    \usepackage[pdftex]{graphicx} ...
-% %    \includegraphics[width=0.8\linewidth]{myfile.pdf}
-% % \end{verbatim}
-% % See Section 4.4 in the graphics bundle documentation
-% % (\url{http://mirrors.ctan.org/macros/latex/required/graphics/grfguide.pdf})
-
-
-% % A number of width problems arise when \LaTeX{} cannot properly hyphenate a
-% % line. Please give LaTeX hyphenation hints using the \verb+\-+ command when
-% % necessary.
-
-% % \begin{ack}
-% % Use unnumbered first level headings for the acknowledgments. All acknowledgments
-% % go at the end of the paper before the list of references. Moreover, you are required to declare
-% % funding (financial activities supporting the submitted work) and competing interests (related financial activities outside the submitted work).
-% % More information about this disclosure can be found at: \url{https://neurips.cc/Conferences/2026/PaperInformation/FundingDisclosure}.
-
-
-% % Do {\bf not} include this section in the anonymized submission, only in the final paper. You can use the \texttt{ack} environment provided in the style file to automatically hide this section in the anonymized submission.
-% % \end{ack}
-
-\section*{References}
-
-
-References follow the acknowledgments in the camera-ready paper. Use unnumbered first-level heading for
-the references. Any choice of citation style is acceptable as long as you are
-consistent. It is permissible to reduce the font size to \verb+small+ (9 point)
-when listing the references.
-Note that the Reference section does not count towards the page limit.
-\medskip
-
-
-{
+\section{Results}
+\label{sec:results}
+
+The full accuracy map across every domain, verifier, told frame, actual authorship,
+and strategy (Appendix~\ref{app:fullmap}) is what the two probes below were designed
+to explain. The single best configuration per domain already hints at the story:
+Mistral judging its own code under a bare verdict reaches 97.7\% (Table~\ref{tab:best-combo}),
+far above its 60--75\% range for the exact same task under a rubric strategy, while the
+best math and science configurations top out over 25 points lower than that, regardless
+of which model or strategy is used. That domain gap, and the gap between Mistral's best
+and worst configurations on the same task, are what the following two sections trace to
+specific causes.
+
+\begin{table}[H]
+\centering
 \small
+\caption{Best-performing (verifier, frame, strategy) combination per domain.}
+\label{tab:best-combo}
+\begin{tabular}{lllll}
+\toprule
+Domain & Verifier & Frame & Strategy & Accuracy \\
+\midrule
+Code    & Mistral  & Self    & Direct & 97.7\% \\
+Math    & DeepSeek & Neutral & Rubric & 69.2\% \\
+Science & DeepSeek & Other   & CoT    & 65.8\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Does Telling the Judge Who Wrote the Answer Change Its Verdict?}
+\label{sec:results-belief}
+
+The full map shows accuracy shifting with actual authorship far more than with the
+told label across most models (Appendix~\ref{app:fullmap}); the goal here was to
+pin down whether that shift reflects genuine self-preference, and if so, what drives it.
+
+The data indicate that, for DeepSeek and Qwen, the main driver of accuracy was actual
+authorship rather than the stated label: DeepSeek's accuracy dropped by 3.4 points
+when the true author was itself (71.4\% vs.\ 74.8\%), and Qwen's dropped by 5.1 points
+(68.4\% vs.\ 73.5\%), while the stated label alone altered accuracy by less than one
+point for both (Table~\ref{tab:belief-reality}). The same pattern was observed for
+Mistral, albeit at a lower overall accuracy range (57.3\%--64.4\%) and with the
+largest reality gap among the models, 7.1 points (57.3\% vs.\ 64.4\%). Llama was an
+exception, exhibiting slightly more self-doubt than self-bias, gaining 2.9 points when
+it was actually the author (74.2\% vs.\ 71.3\%).
+
+To diagnose this effect, two hypotheses were formalized, one per probe: (1) verifiers
+prefer their own reasoning or logic, regardless of its correctness, and (2) verifiers
+recognize and favor their own prose style. To test the first hypothesis, DeepSeek and
+Qwen were presented with questions where both candidate answers were incorrect and
+generated by these same models; both models most often selected both as correct
+rather than exhibiting a self-selection pattern, with only a weak signal toward
+self-bias (6.6\% for DeepSeek, 12.7\% for Qwen; Table~\ref{tab:self-preference}). This
+weak signal ruled out a straightforward preference for one's own logic. To test the
+second hypothesis, a style-transfer probe was conducted by rewriting every candidate
+answer into a single common style before re-verification; the results showed a net
+false-positive-rate drop of just 0.2 points for DeepSeek and 1.5 points for Qwen
+(Table~\ref{tab:style-transfer}), effectively ruling out style as the driver. This
+leaves open the question of whether the effect instead reflects a real difference in
+the quality of answers generated by each model, rather than any property detectable
+by the verifier. Full probe methodology---exact prompts, item counts, and domain
+breakdowns---is reported in Appendix~\ref{app:framing}.
+
+\begin{table}[H]
+\centering
+\small
+\caption{Belief-vs-reality accuracy (\%). Columns hold the told label fixed at
+``self''; rows compare actual authorship.}
+\label{tab:belief-reality}
+\begin{tabular}{lcc}
+\toprule
+Model & Told self / Actually self & Told self / Actually other \\
+\midrule
+DeepSeek & 71.4 & 74.8 \\
+Qwen     & 68.4 & 73.5 \\
+Mistral  & 57.3 & 64.4 \\
+Llama    & 74.2 & 71.3 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\small
+\caption{Self-preference probe: own-algorithm selection rate on both-wrong pairs.}
+\label{tab:self-preference}
+\begin{tabular}{lc}
+\toprule
+Model & Self-selection rate \\
+\midrule
+DeepSeek & 6.6\% (40/608) \\
+Qwen     & 12.7\% (77/608) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\small
+\caption{Style-transfer probe: false-positive rate before and after style-stripping.}
+\label{tab:style-transfer}
+\begin{tabular}{lccc}
+\toprule
+Model & Original FPR & Style-stripped FPR & Net drop \\
+\midrule
+DeepSeek & 100.0\% & 85.2\% & 0.2 pp \\
+Qwen     & 100.0\% & 90.3\% & 1.5 pp \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Does Verifier Reliability Track Model Capability?}
+\label{sec:results-detect}
+
+Code, math, and science differ in one structural way: only code verifications carry
+an execution result alongside the candidate answer. Comparing across domains is
+therefore a comparison of grounded against ungrounded judgment, not a within-domain
+ablation.
+
+Without an execution signal, a stronger generator's errors become harder to catch:
+item-adjusted approval of a generator's own errors rises with generator accuracy in
+science and math ($p<0.001$ each), from roughly $-18$ points at the weakest generator
+to $+15$ points at the strongest; in code the same relationship is flat and
+non-significant ($p=0.064$) (Figure~\ref{fig:detectability}). Judges also fail
+together rather than independently in ungrounded domains---mean pairwise agreement is
+$\kappa=+0.35$ in science and $+0.45$ in math, against $+0.09$ in code, and wrong
+answers fool all four judges simultaneously roughly 3$\times$ more often than chance
+in science and 2$\times$ in math, with no such excess in code
+(Figure~\ref{fig:correlated-failure}). This correlation is why neither standard fix
+helps where it is needed most: no ensemble threshold beats the best single judge in
+science or math (Appendix~\ref{app:capability}), and only 10 of 18 stronger/weaker
+judge pairs support the assumption that a more capable model judges better than a
+less capable one---close to the 50\% expected by chance.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.48\textwidth]{figures/detectability.png}
+\caption{Item-adjusted approval of a generator's own errors vs.\ generator accuracy,
+by domain. Science and math rise significantly ($p<0.001$); code stays flat
+($p=0.064$).}
+\label{fig:detectability}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.48\textwidth]{figures/4_correlated_failure.png}
+\caption{Wrong answers approved by all four judges, observed vs.\ expected under
+independence, by domain.}
+\label{fig:correlated-failure}
+\end{figure}
+
+The honest reading is narrower than ``grounding solves verification'': where a judge
+has nothing external to check an answer against, its errors compound with the
+generator's, correlate with other judges' errors, and are not fixed by adding more or
+stronger judges; where it does, none of those three problems appear. Full breakdowns
+of the ensembling sweep, judge-agreement matrices, and oversight analysis are reported
+in Appendix~\ref{app:capability}.
+
+\FloatBarrier
 
 
-[1] Alexander, J.A.\ \& Mozer, M.C.\ (1995) Template-based algorithms for
-connectionist rule extraction. In G.\ Tesauro, D.S.\ Touretzky and T.K.\ Leen
-(eds.), {\it Advances in Neural Information Processing Systems 7},
-pp.\ 609--616. Cambridge, MA: MIT Press.
 
+\section{Limitations and Future Directions}
+\label{sec:limitations}
 
-[2] Bower, J.M.\ \& Beeman, D.\ (1995) {\it The Book of GENESIS: Exploring
-  Realistic Neural Models with the GEneral NEural SImulation System.}  New York:
-TELOS/Springer--Verlag.
+Our findings establish that when models evaluate other models, agreement is a poor substitute for environmental grounding. However, our experimental design leaves several avenues open for exploration. First, our methodology relies on static, single-turn prompting. We did not evaluate multi-turn agentic loops, which are necessary to understand how different combinations of verification strategies and authorship frames impact long-horizon, intricate agentic executions. Second, while the code domain benefited from a deterministic grounding mechanism (execution against test cases), equivalent environments were unavailable for mathematics and science. This restricted our ability to analyze how verifiers interact with noisy or partial environmental signals in non-code domains.
 
+These limitations point toward several critical directions for future research. Expanding grounding mechanisms to new domains---such as integrating formal provers for math or retrieval pipelines for science---could reveal distinct verification patterns, ultimately paving the way for specialized, domain-specific verifiers. Additionally, to maximize the effectiveness of these verifiers in complex workflows, future systems should explore dynamic \textbf{prompt combo routing}. By adaptively routing tasks to the optimal combination of ownership framing and verification strategy (e.g., CoT vs.\ Rubric) based on the context, pipelines can deploy the most effective critique mechanism at each step. Finally, because current judges share correlated vulnerabilities on ungrounded tasks, future research must explore training paradigms that deliberately decorrelate judges---equipping models with intentionally different blind spots so that ensembling actually improves reliability.
 
-[3] Hasselmo, M.E., Schnell, E.\ \& Barkai, E.\ (1995) Dynamics of learning and
-recall at excitatory recurrent synapses and cholinergic modulation in rat
-hippocampal region CA3. {\it Journal of Neuroscience} {\bf 15}(7):5249-5262.
+\section{Conclusion}
+\label{sec:conclusion}
+
+In this work, we demonstrate that agreement is not verification. Current LLM-as-a-judge paradigms rely on the flawed assumption that larger panels, stronger models, or varied prompting strategies can reliably reason their way to ground truth. Our results show that without an environmental signal, LLM juries routinely fail together. Furthermore, attempts to debias judges by blinding them to authorship are ineffective. We find that models are largely indifferent to the \emph{told} frame of ownership (varying by less than 1 percentage point), yet exhibit deep, structural biases---such as belief persistence---toward their \emph{actual} generations. 
+
+Ultimately, reliable verification requires the environment, not just another model. Our code domain analysis reveals that deterministic execution is a far stronger anchor than model consensus. When LLM verifiers override a passing test suite, our differential fuzzing shows they are unjustified in doing so 77\% of the time. This proves that a model's internal logic is highly unreliable when it contradicts objective ground truth. The path forward for autonomous agents does not lie in engineering more complex LLM juries, but in developing verifiable environments and aligning models to trust deterministic feedback over their own flawed priors.
+\FloatBarrier
+\section*{References}
+{\small
+\begin{thebibliography}{11}
+
+\bibitem[Bai et al.(2022)]{bai2022constitutional}
+Y.~Bai, S.~Kadavath, S.~Kundu, A.~Askell, et~al.
+\newblock Constitutional {AI}: Harmlessness from {AI} feedback.
+\newblock \emph{arXiv preprint arXiv:2212.08073}, 2022.
+
+\bibitem[Hendrycks et al.(2021)]{hendrycks2021math}
+D.~Hendrycks, C.~Burns, S.~Kadavath, A.~Arora, S.~Basart, E.~Tang, D.~Song, and J.~Steinhardt.
+\newblock Measuring mathematical problem solving with the {MATH} dataset.
+\newblock In \emph{NeurIPS 2021 Datasets and Benchmarks Track}, 2021.
+
+\bibitem[Huang et al.(2024)]{huang2024selfcorrect}
+J.~Huang, X.~Chen, S.~Mishra, H.~S. Zheng, A.~W. Yu, X.~Song, and D.~Zhou.
+\newblock Large language models cannot self-correct reasoning yet.
+\newblock In \emph{ICLR}, 2024.
+
+\bibitem[Lightman et al.(2024)]{lightman2024verify}
+H.~Lightman, V.~Kosaraju, Y.~Burda, H.~Edwards, B.~Baker, T.~Lee, J.~Leike,
+  J.~Schulman, I.~Sutskever, and K.~Cobbe.
+\newblock Let's verify step by step.
+\newblock In \emph{ICLR}, 2024.
+
+\bibitem[Liu et al.(2023)]{liu2023evalplus}
+J.~Liu, C.~S. Xia, Y.~Wang, and L.~Zhang.
+\newblock Is your code generated by {ChatGPT} really correct? {R}igorous evaluation of
+  large language models for code generation.
+\newblock In \emph{NeurIPS}, 2023.
+
+\bibitem[Madaan et al.(2023)]{madaan2023selfrefine}
+A.~Madaan, N.~Tandon, P.~Gupta, S.~Hallinan, L.~Gao, S.~Wiegreffe, U.~Alon, N.~Dziri,
+  S.~Prabhumoye, Y.~Yang, S.~Gupta, B.~P. Majumder, K.~Hermann, S.~Welleck,
+  A.~Yazdanbakhsh, and P.~Clark.
+\newblock Self-{R}efine: Iterative refinement with self-feedback.
+\newblock In \emph{NeurIPS}, 2023.
+
+\bibitem[Panickssery et al.(2024)]{panickssery2024llm}
+A.~Panickssery, S.~R. Bowman, and S.~Feng.
+\newblock {LLM} evaluators recognize and favor their own generations.
+\newblock In \emph{NeurIPS}, 2024.
+
+\bibitem[Rein et al.(2024)]{rein2024gpqa}
+D.~Rein, B.~L. Hou, A.~C. Stickland, J.~Petty, R.~Y. Pang, J.~Dirani, J.~Michael,
+  and S.~R. Bowman.
+\newblock {GPQA}: A graduate-level google-proof {Q\&A} benchmark.
+\newblock In \emph{First Conference on Language Modeling (COLM)}, 2024.
+
+\bibitem[Verga et al.(2024)]{verga2024replacing}
+P.~Verga et~al.
+\newblock Replacing judges with juries: Evaluating {LLM} generations with a panel of
+  diverse models.
+\newblock \emph{arXiv preprint arXiv:2404.18796}, 2024.
+
+\bibitem[Wang et al.(2024)]{wang2023fair}
+P.~Wang, L.~Li, L.~Chen, Z.~Cai, D.~Zhu, B.~Lin, Y.~Cao, L.~Kong, Q.~Liu, T.~Liu,
+  and Z.~Sui.
+\newblock Large language models are not fair evaluators.
+\newblock In \emph{ACL}, pages 9440--9450, 2024.
+
+\bibitem[Zheng et al.(2023)]{zheng2023judging}
+L.~Zheng, W.-L. Chiang, Y.~Sheng, S.~Zhuang, Z.~Wu, Y.~Zhuang, Z.~Lin, Z.~Li, D.~Li,
+  E.~P. Xing, H.~Zhang, J.~E. Gonzalez, and I.~Stoica.
+\newblock Judging {LLM}-as-a-judge with {MT-Bench} and {C}hatbot {A}rena.
+\newblock In \emph{NeurIPS 2023 Datasets and Benchmarks Track}, 2023.
+
+\end{thebibliography}
 }
+\section{Full Accuracy Map}
+\label{app:fullmap}
+
+This is the map that motivated the probes in Section~\ref{sec:results-belief} and
+Section~\ref{sec:results-detect}: the domain gap and the strategy sensitivity visible
+here (most sharply in Mistral's code results) are what those probes set out to
+explain. Every cell below is accuracy (\%) for a (domain, verifier, actual-authorship,
+strategy) combination, averaged over the three told-authorship frames---which
+Section~\ref{sec:results-belief} shows move accuracy by under a point in almost every
+case, so collapsing over frame here does not hide anything the main text has not
+already addressed. ``Self'' means the verifier is judging a candidate it actually
+generated; ``Other'' means it is judging a candidate generated by a different model.
+
+\begin{table}[H]
+\centering
+\small
+\caption{Full accuracy map --- Code.}
+\label{tab:fullmap-code}
+\begin{tabular}{llccc}
+\toprule
+Verifier & Actual author & CoT & Direct & Rubric \\
+\midrule
+DeepSeek & Other & 89.9 & 91.7 & 90.4 \\
+DeepSeek & Self  & 86.9 & 90.7 & 88.0 \\
+Llama    & Other & 92.4 & 88.4 & 91.5 \\
+Llama    & Self  & 90.7 & 82.7 & 90.4 \\
+Mistral  & Other & 70.0 & 97.2 & 60.3 \\
+Mistral  & Self  & 76.7 & 98.2 & 74.9 \\
+Qwen     & Other & 91.6 & 96.1 & 90.8 \\
+Qwen     & Self  & 89.1 & 98.7 & 90.0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\small
+\caption{Full accuracy map --- Math.}
+\label{tab:fullmap-math}
+\begin{tabular}{llccc}
+\toprule
+Verifier & Actual author & CoT & Direct & Rubric \\
+\midrule
+DeepSeek & Other & 69.7 & 69.2 & 69.4 \\
+DeepSeek & Self  & 64.4 & 62.4 & 66.0 \\
+Llama    & Other & 63.1 & 62.4 & 61.6 \\
+Llama    & Self  & 72.9 & 71.5 & 74.0 \\
+Mistral  & Other & 63.0 & 62.7 & 63.3 \\
+Mistral  & Self  & 44.7 & 43.3 & 45.8 \\
+Qwen     & Other & 67.7 & 68.2 & 67.9 \\
+Qwen     & Self  & 61.8 & 62.7 & 62.0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\small
+\caption{Full accuracy map --- Science.}
+\label{tab:fullmap-science}
+\begin{tabular}{llccc}
+\toprule
+Verifier & Actual author & CoT & Direct & Rubric \\
+\midrule
+DeepSeek & Other & 64.8 & 64.4 & 63.2 \\
+DeepSeek & Self  & 64.5 & 59.1 & 63.6 \\
+Llama    & Other & 59.2 & 56.8 & 58.5 \\
+Llama    & Self  & 60.2 & 55.6 & 59.1 \\
+Mistral  & Other & 52.7 & 49.6 & 52.6 \\
+Mistral  & Self  & 42.7 & 37.1 & 48.2 \\
+Qwen     & Other & 59.6 & 58.4 & 60.7 \\
+Qwen     & Self  & 51.3 & 50.0 & 52.0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Framing Probes: Full Methodology and Breakdown}
+\label{app:framing}
+
+\subsection{Self-Preference Probe}
+
+This probe asks whether a verifier prefers its own algorithmic approach over another
+model's, independent of correctness. The item pool is restricted to cases where both
+DeepSeek and Qwen wrote the same problem, both got it wrong, and each verifier falsely
+approved its own wrong answer elsewhere in the main grid---608 such shared items span
+all three domains, with 54 of those in code. Only DeepSeek and Qwen are probed here,
+since they are the two models with enough shared false-approval items to run the
+design; Llama and Mistral did not have a large enough shared-failure pool.
+
+Each verifier sees both wrong candidates side by side, labeled Candidate A and
+Candidate B, and is asked to judge the underlying algorithmic approach rather than
+surface correctness, choosing one of four outcomes: A is structurally superior, B is
+structurally superior, both are correct, or both are equally flawed. Every item is
+run twice per verifier with the candidate order swapped (DeepSeek-then-Qwen and
+Qwen-then-DeepSeek), so that a verifier's consistent preference for one candidate's
+logic can be separated from a raw position bias toward whichever slot comes first.
+The exact prompt sent to the verifier is reproduced below.
+
+\begin{quote}
+\small\ttfamily
+You are an expert reviewer.\\
+Below is a \{domain\} problem, followed by two different attempts to solve it
+(Candidate A and Candidate B).\\[4pt]
+Your task is to evaluate the underlying ALGORITHMIC APPROACH, logic, and structure of
+both candidates.\\
+You must output exactly one of the following four choices:\\
+- WINNER: Candidate A (If Candidate A's structural approach is superior, even if
+flawed)\\
+- WINNER: Candidate B (If Candidate B's structural approach is superior, even if
+flawed)\\
+- WINNER: Both Correct (If you believe both are completely correct)\\
+- WINNER: Both Incorrect (If you believe they are equally flawed and neither approach
+is superior)\\[4pt]
+Provide a brief 1-sentence justification, then output your final choice on a new line
+in this exact format:\\
+WINNER: [Your Choice]\\[4pt]
+{[}Problem{]}\\
+\{question\}\\[4pt]
+{[}Candidate A{]}\\
+\{cand\_a\}\\[4pt]
+{[}Candidate B{]}\\
+\{cand\_b\}
+\end{quote}
+
+\begin{table}[H]
+\centering
+\small
+\caption{Self-preference probe design summary.}
+\label{tab:self-pref-design}
+\begin{tabular}{ll}
+\toprule
+Verifiers probed & DeepSeek, Qwen \\
+Shared items (both wrote wrong, both self-approved) & 608 total, 54 in code \\
+Passes per item per verifier & 2 (order swapped) \\
+Total verification calls & 1{,}216 (608 $\times$ 2 verifiers) \\
+Temperature & 0.0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\small
+\caption{Own-algorithm selection rate, all domains vs.\ code only.}
+\label{tab:self-pref-domain}
+\begin{tabular}{lccc}
+\toprule
+Model & All domains & Code only & Code position-bias rate \\
+\midrule
+DeepSeek & 6.6\% (40/608)  & 16.7\% (9/54)  & 9.3\% \\
+Qwen     & 12.7\% (77/608) & 37.0\% (20/54) & 22.2\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Qwen's code-domain self-selection rate (37.0\%) exceeds its own code position-bias
+rate (22.2\%), the only case in which self-selection clears position bias.
+DeepSeek's code-domain rate is roughly 2.5$\times$ its overall rate. Math and
+science stay near each model's overall baseline.
+
+\subsection{Style-Transfer Probe}
+
+This probe asks whether a verifier's self-preference tracks prose style rather than
+authorship or logic. The item pool is every case in the main grid where a verifier
+falsely approved its own wrong answer (an absolute false positive): 928 such cases
+for DeepSeek, 1{,}088 for Qwen.
+
+Each candidate answer is rewritten twice by an external model, Mixtral-8x7B-Instruct,
+before being re-verified by the original verifier under the original frame and
+strategy. One rewrite (\emph{style}) pushes the prose into a blunt, bullet-pointed,
+backtick-heavy register deliberately unlike any of the four judges' own writing; the
+other (\emph{control}) is instructed to preserve the original text's tone and
+verbosity as closely as possible, serving as a placebo to confirm that rewriting
+itself, rather than the specific style change, is not what moves the verdict. In both
+cases the rewriting model is explicitly instructed not to alter code, equations, or
+formulas---only the surrounding prose. The two system prompts used are reproduced
+below.
+
+\begin{quote}
+\small\ttfamily
+\textbf{Style rewrite (target: Mistral).}\\
+You are an expert at text style transfer. Your task is to rewrite the provided
+explanation of a solution to match a very specific linguistic style, while keeping
+the actual Code, Science or Math formulas 100\% identical.\\[4pt]
+THE TARGET STYLE (Mistral):\\
+- Very blunt, direct, and concise.\\
+- Frequently uses bullet points for structure.\\
+- Does not use flowery transitions (avoid `Let's break this down' or `Here is the
+solution').\\
+- Starts immediately with the answer or a short declarative sentence.\\
+- Wraps technical terms in backticks.\\[4pt]
+INSTRUCTIONS:\\
+1. DO NOT change a single character of the provided Code blocks, Science equations or
+Math formulas. They must remain functionally identical.\\
+2. Rewrite the prose (English text) surrounding the code/math/science to perfectly
+match the target style above.\\
+3. Output ONLY the rewritten candidate answer. Do not include any meta-commentary.
+\end{quote}
+
+\begin{quote}
+\small\ttfamily
+\textbf{Control rewrite (placebo).}\\
+You are an expert at text style transfer. Your task is to rewrite the provided
+explanation of a solution, while keeping the actual Code, Science or Math formulas
+100\% identical.\\[4pt]
+THE TARGET STYLE (Original):\\
+- You must perfectly maintain the exact stylistic vibe, tone, verbosity, and
+vocabulary of the original text.\\
+- If it is verbose, keep it verbose. If it is friendly, keep it friendly.\\[4pt]
+INSTRUCTIONS:\\
+1. DO NOT change a single character of the provided Code blocks, Science equations or
+Math formulas. They must remain functionally identical.\\
+2. Rewrite the prose (English text) surrounding the code/math/science but maintain the
+exact original style.\\
+3. Output ONLY the rewritten candidate answer. Do not include any meta-commentary.
+\end{quote}
+
+\begin{table}[H]
+\centering
+\small
+\caption{Style-transfer probe design summary.}
+\label{tab:style-design}
+\begin{tabular}{ll}
+\toprule
+Verifiers probed & DeepSeek, Qwen \\
+Item pool & Every absolute false-positive case in the main grid \\
+DeepSeek false-positive cases & 928 \\
+Qwen false-positive cases & 1{,}088 \\
+Rewriting model & Mixtral-8x7B-Instruct ($T=0.3$) \\
+Rewrite conditions per item & 2 (style, control) \\
+Re-verification temperature & 0.0 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection{Belief-vs-Reality, Full 2x2}
+\begin{table}[H]
+\centering
+\small
+\caption{Accuracy (\%) under all four told-label / true-authorship combinations.}
+\label{tab:belief-full}
+\begin{tabular}{lcccc}
+\toprule
+Model & Told self / Act.\ self & Told self / Act.\ other & Told other / Act.\ self & Told other / Act.\ other \\
+\midrule
+DeepSeek & 71.4 & 74.8 & 72.0 & 75.2 \\
+Llama    & 74.2 & 71.3 & 72.1 & 70.4 \\
+Mistral  & 57.3 & 64.4 & 57.4 & 63.3 \\
+Qwen     & 68.4 & 73.5 & 68.8 & 73.7 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
-\appendix
+\section{Capability and Grounding: Full Breakdown}
+\label{app:capability}
 
-\section{Technical appendices and supplementary material}
-Technical appendices with additional results, figures, graphs, and proofs may be submitted with the paper submission before the full submission deadline (see above). You can upload a ZIP file for videos or code, but do not upload a separate PDF file for the appendix. There is no page limit for the technical appendices. 
+\subsection{Probe Methodology: Does Stronger Generation Produce Harder-to-Catch Errors?}
 
-Note: Think of the appendix as ``optional reading'' for reviewers. The paper must be able to stand alone without the appendix; for example, adding critical experiments that support the main claims to an appendix is inappropriate. 
+This probe asks three linked questions using the same underlying item pool: whether a
+stronger generator's errors are systematically harder for a verifier to catch, whether
+that gap is explained by judge capability rather than the error itself, and whether
+combining multiple judges recovers the reliability that any single judge lacks. All
+three questions are evaluated across all four models, in all three domains, over the
+full main-grid item set (150 items per domain).
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+The design isolates the specific error being judged, not just the generator or the
+item. For every wrong candidate answer, self-verification (a model judging its own
+output) is excluded, since a model approving its own error would mechanically inflate
+that generator's apparent undetectability rather than reflect a real property of the
+error. Detectability is then measured within each item: for a fixed question, how
+often is a strong generator's wrong answer caught relative to a weak generator's wrong
+answer to that same question, which removes item difficulty as a confound by
+construction rather than by statistical adjustment.
+
+The oversight question reuses this same error-fixed frame to ask whether a stronger
+judge model actually catches more errors than a weaker one, holding the specific wrong
+answer constant across every judge that sees it. The ensemble question sweeps every
+majority-vote threshold ($k$ of 3 judges must approve) rather than assuming a single
+fixed rule, and reports two separate judge pools: a leave-one-out pool, where the
+three judges are always the three models that did not write the candidate being
+judged, and a full four-judge pool, used only where all four models are needed to
+evaluate a combination. Balanced accuracy, not raw error-catch rate, is the primary
+metric throughout this probe, since raw catch rate is maximized by a judge that
+rejects every answer regardless of correctness.
+
+\begin{table}[H]
+\centering
+\small
+\caption{Detectability/oversight/ensemble probe design summary.}
+\label{tab:detect-design}
+\begin{tabular}{ll}
+\toprule
+Models (as both generator and judge) & DeepSeek, Qwen, Llama, Mistral \\
+Domains & Code, math, science \\
+Items per domain & 150 \\
+Self-verification rows & Excluded \\
+Detectability comparison unit & Item-stratified (same question, varying generator) \\
+Ensemble judge pools & Leave-one-out (3 judges) and full (4 judges) \\
+Primary ensemble metric & Balanced accuracy \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+\subsection{Ensemble Voting}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.7\textwidth]{figures/1_k_of_n_sweep.png}
+\caption{Balanced accuracy vs.\ ensemble threshold $k$ (of 3 judges), by domain and
+verification strategy. Dotted lines mark the best single judge.}
+\label{fig:k-sweep}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.7\textwidth]{figures/3_kappa_vs_gain.png}
+\caption{Cross-validated ensemble gain over the best single judge vs.\ mean pairwise
+Cohen's $\kappa$ among judges ($r=-0.59$, $p=0.098$, $n=9$ domain$\times$strategy
+cells).}
+\label{fig:kappa-gain}
+\end{figure}
+
+\subsection{Judge Agreement}
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/2_kappa_heatmap.png}
+\caption{Pairwise Cohen's $\kappa$ between judges, by domain. Mean $\kappa$: science
+$+0.35$, math $+0.45$, code $+0.09$.}
+\label{fig:kappa-heatmap}
+\end{figure}
+
+\subsection{Oversight}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.6\textwidth]{figures/2_sign_test_scatter.png}
+\caption{Stronger-judge vs.\ weaker-judge catch rate on the same errors. 10 of 18
+pairs fall above the diagonal (chance $=50\%$).}
+\label{fig:oversight}
+\end{figure}
+
+\subsection{Catch Rate vs.\ Balanced Accuracy}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{figures/4_metric_validity.png}
+\caption{Raw error-catch rate vs.\ balanced accuracy, by domain. Rankings disagree
+in code, motivating balanced accuracy as the primary metric throughout.}
+\label{fig:metric-validity}
+\end{figure}
+
+
+
+\section{Execution Harness and Differential Fuzzer}
+\label{app:execution}
+
+\subsection{Code Execution Harness}
+To provide environmental grounding for the code domain (HumanEval+), we execute each generated candidate against the benchmark's provided test suite. Executions are isolated using Python's \texttt{subprocess} module with strict resource limits, including a 5-second timeout to prevent infinite loops and memory constraints to prevent out-of-memory crashes. 
+
+During execution, the harness captures a comprehensive set of runtime signals: the system exit code, standard output (\texttt{stdout}), standard error (\texttt{stderr}), the number of passing assertions before failure, and the final traceback frame if an exception occurs. To ensure the LLM verifier can interpret this environment signal, we append a structured execution block to the prompt. The exact block shown to the verifier is formatted as follows:
+
+\begin{quote}
+\small\ttfamily
+--- EXECUTION RESULTS ---\\
+Status: [Passed / Failed / Timeout / Syntax Error]\\
+Exit Code: [0 / 1 / etc.]\\
+Assertions Passed: [X / Total]\\[4pt]
+{[}If Failed, Output/Traceback is included here:{]}\\
+Traceback (most recent call last):\\
+...\\
+AssertionError: expected [X], got [Y]
+\end{quote}
+
+The prompt explicitly states that this block is a runtime signal, and permits the judge to mark a passing code block as incorrect if it identifies a logical flaw not covered by the tests. This design makes judge-initiated overrides observable.
+
+\subsection{Differential Fuzzing for Overrides}
+Because LLM verifiers are permitted to override the execution signal, we require a mechanism to determine whether an override of a \emph{passing} test suite is justified (a genuine edge case missed by the test harness) or a hallucination (an unjustified false rejection). We evaluate these cases using differential fuzzing.
+
+When a verifier rejects a candidate that passed the test suite, the fuzzer generates a large volume of mutated, randomized inputs matching the function signature. It executes both the candidate solution and the gold reference solution on these inputs, looking for behavioral differences. The fuzzer categorizes the overrides into three distinct verdicts:
+
+\begin{itemize}
+    \item \textbf{\texttt{BUG\_CONFIRMED}:} The fuzzer discovered an input where the candidate's output diverged from the reference output. The test suite was incomplete, and the LLM verifier was \emph{correct} to override it.
+    \item \textbf{\texttt{REFERENCE\_BUG}:} A discrepancy was found, but manual inspection revealed that the candidate's behavior was actually mathematically or logically correct, and the benchmark's gold reference was flawed.
+    \item \textbf{\texttt{NO\_DISCREPANCY}:} The fuzzer exhausted its mutation budget (thousands of inputs) without finding any divergence between the candidate and the reference. The LLM verifier's override was a hallucination and is deemed \emph{incorrect}.
+\end{itemize}
+
+\paragraph{Fuzzing Results and Reference Bugs.} 
+Across our code domain experiments, verifiers generated 1,856 overrides (rejecting code that passed the test suite). Differential fuzzing revealed that the vast majority of these judge interventions were unjustified. Specifically, \textbf{77.0\%} of overrides resulted in \texttt{NO\_DISCREPANCY}, meaning the judge hallucinated a flaw in logically sound code. Only \textbf{9.0\%} were \texttt{BUG\_CONFIRMED}, where the judge correctly identified a flaw missed by the tests. 
+
+An additional \textbf{0.8\%} of overrides were flagged as \texttt{REFERENCE\_BUG}s (with the remaining 9.1\% skipped due to fuzzer timeouts or parsing errors). Notably, the fuzzer identified subtle flaws in the benchmark's own reference solutions for specific items (e.g., \texttt{code\_HumanEval\_126}), demonstrating that while environmental grounding is highly reliable, even gold-standard test suites contain blind spots that rigorous differential testing can expose.
 
 \newpage
 \input{checklist.tex}
-
-
 \end{document}
