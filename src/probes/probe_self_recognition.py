@@ -38,7 +38,7 @@ except Exception:
 
 from models import generate_response, MODELS
 
-OUT_DIR = os.path.join("data", "self_recognition")
+OUT_DIR = os.path.join("reports", "probes", "self_recognition")
 PRICING = {"qwen": (0.36, 0.40), "deepseek": (0.32, 0.89),
            "llama": (0.10, 0.32), "mistral": (0.019, 0.03)}
 
