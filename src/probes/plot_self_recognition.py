@@ -27,7 +27,7 @@ from analysis_detectability import load_or_build_grades
 
 DOMAINS = ["science", "math", "code"]
 COL = {"science": "#C44E52", "math": "#4C72B0", "code": "#55A868"}
-OUT = os.path.join("plots", "actual", "self_recognition")
+OUT = os.path.join("reports", "probes", "self_recognition")
 os.makedirs(OUT, exist_ok=True)
 MODE = "actual"
 
