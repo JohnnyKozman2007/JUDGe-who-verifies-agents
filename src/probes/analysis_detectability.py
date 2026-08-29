@@ -34,7 +34,7 @@ def load_or_build_grades(domain, mode="actual"):
     directory or every downstream number will be computed against stale grades.
     """
     suffix = "_pilot.jsonl" if mode == "pilot" else ".jsonl"
-    cache_dir = os.path.join("data", "graded")
+    cache_dir = os.path.join("reports", "probes", "Do-stronger-models-make-mistakes-that-are-harder-to-catch")
     os.makedirs(cache_dir, exist_ok=True)
     cache = os.path.join(cache_dir, f"graded_{domain}{'_pilot' if mode=='pilot' else ''}.json")
     if os.path.exists(cache):
