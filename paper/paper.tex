@@ -917,4 +917,7 @@ When a verifier rejects a candidate that passed the test suite, the fuzzer gener
 Across our code domain experiments, verifiers generated 1,856 overrides (rejecting code that passed the test suite). Differential fuzzing revealed that the vast majority of these judge interventions were unjustified. Specifically, \textbf{77.0\%} of overrides resulted in \texttt{NO\_DISCREPANCY}, meaning the judge hallucinated a flaw in logically sound code. Only \textbf{9.0\%} were \texttt{BUG\_CONFIRMED}, where the judge correctly identified a flaw missed by the tests. 
 
 An additional \textbf{0.8\%} of overrides were flagged as \texttt{REFERENCE\_BUG}s (with the remaining 9.1\% skipped due to fuzzer timeouts or parsing errors). Notably, the fuzzer identified subtle flaws in the benchmark's own reference solutions for specific items (e.g., \texttt{code\_HumanEval\_126}), demonstrating that while environmental grounding is highly reliable, even gold-standard test suites contain blind spots that rigorous differential testing can expose.
+
+\newpage
+\input{checklist.tex}
 \end{document}
