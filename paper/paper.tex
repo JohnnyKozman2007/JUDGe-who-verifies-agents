@@ -118,13 +118,13 @@
   verification strategy narrows the gap; where the task admits no executable check,
   judges fail together rather than independently, so adding judges buys nothing. Only
   an environment signal changes the picture, and even then judges override that signal
-  on roughly one in ten calls, with independent differential testing confirming fewer
+  on roughly one in eight calls, with independent differential testing confirming fewer
   than one in ten of those overrides as justified. The binding constraint on agent
   verification is the signal the environment can supply, not the model reading it.
 \end{abstract}
 
 \section{Introduction}
-\label{Introduction}
+\label{sec:intro}
 
 Language models are increasingly asked to check other models' work. An LLM verifier
 decides whether a candidate answer is correct, and that decision is load-bearing: it
@@ -181,7 +181,7 @@ judge is shown an execution result, against 57.2\%--64.5\% where it must judge u
 (Appendix~\ref{app:capability}), and
 the correlation between judges' errors disappears in the grounded case. Even then the
 judge is not the source of that reliability---it contradicts the runtime result on
-roughly one in ten calls, and independent differential testing supports fewer than one in ten of
+roughly one in eight calls, and independent differential testing supports fewer than one in ten of
 those contradictions.
 
 \paragraph{Contributions.}
@@ -212,7 +212,9 @@ attribute reliability to grounding rather than to judge capability.
 \paragraph{Tasks.} We draw 150 items from each of three benchmarks with a fixed sampling
 seed: HumanEval+~\citep{liu2023evalplus} for code, MATH~\citep{hendrycks2021math} for
 mathematics, and GPQA-Diamond~\citep{rein2024gpqa} for graduate-level science.
-\footnote{HumanEval+ is distributed under the MIT License; MATH under CC BY-NC-SA 4.0; GPQA-Diamond under the MIT License. All assets are used strictly for academic evaluation.} The domains
+\footnote{HumanEval+/EvalPlus is distributed under Apache-2.0 (built on OpenAI's
+HumanEval under MIT); MATH under the MIT License; GPQA-Diamond under CC BY-4.0, accessed
+under its gated-release terms. All assets are used strictly for academic evaluation.} The domains
 are chosen not for difficulty but for what the environment can verify, and Table~\ref{tab:domains}
 records the distinction the paper turns on. Correctness is established by running the
 candidate in code, by matching a final answer in mathematics, and by a multiple-choice
@@ -243,7 +245,11 @@ discarded before the 150-item sample is drawn.
 
 \paragraph{Models.} Four instruction-tuned models act as both generators and verifiers:
 Qwen2.5-72B-Instruct, DeepSeek-V3, Llama-3.3-70B-Instruct-Turbo, and
-Mistral-Nemo-Instruct-2407. All are served through DeepInfra at temperature~0. The pool deliberately spans a wide capability range, from a 12B dense model
+Mistral-Nemo-Instruct-2407. All are served through DeepInfra at temperature~0, with a
+2500-token budget for generation and 2000 for verification and up to two retries on
+transport failure. The study is inference-only and needs no local GPU: the full grid
+consumes roughly 52M prompt and 3M completion tokens across the 64{,}800 verification
+calls, alongside a CPU-only subprocess harness for code execution. The pool deliberately spans a wide capability range, from a 12B dense model
 to a 671B-parameter mixture of experts; \S\ref{sec:results-detect} exploits that spread,
 and \S\ref{sec:limitations} notes it as a confound for any model-level ranking.
 
@@ -255,7 +261,11 @@ nothing (\textsc{neutral}); prompts are identical apart from that single sentenc
 model is ever named. The \emph{verification strategy} requests a bare verdict
 (\textsc{direct}), a brief chain of thought before the verdict (\textsc{cot}), or a
 rubric-scored assessment (\textsc{rubric}). This yields $4\times4\times3\times3 = 144$
-verifications per item and 64{,}800 in total.
+verifications per item and 64{,}800 in total. One verification in four has a model grading
+its own candidate: those rows are the object of study in \S\ref{sec:results-belief}, and
+are excluded from every analysis that compares judges to one another---detectability,
+oversight, and ensembling---so that self-preference cannot inflate a cross-judge
+comparison.
 
 The design's essential property is that the told frame is crossed with the true
 generator--verifier identity. A judge told ``you wrote this'' is usually being misinformed,
@@ -266,7 +276,8 @@ frame isolates the \emph{fact} of it. Section~\ref{sec:results-belief} reports b
 \paragraph{Execution grounding in code.} Code verifications, and only code verifications,
 carry a block reporting what happened when the candidate was actually run against the
 benchmark's harness: exit status, assertion count, captured output, and the final traceback
-frame on failure. The prompt states that this is a signal rather than the final word and
+frame on failure. Runs exceeding a five-second budget are reported to the judge as a
+timeout rather than a failure. The prompt states that this is a signal rather than the final word and
 explicitly permits the judge to mark passing code incorrect on logical grounds. That
 permission is deliberate: it makes judge-initiated deviation from the environment signal observable, which Appendix~\ref{app:execution} measures. The harness, its timeouts, and the
 differential fuzzer used to adjudicate disputed overrides are described in
@@ -305,8 +316,8 @@ We report the following metrics, computed at the item level throughout:
 The full accuracy map across every domain, verifier, told frame, actual authorship,
 and strategy (Appendix~\ref{app:fullmap}) is what the two probes below were designed
 to explain. The single best configuration per domain already hints at the story:
-Mistral judging its own code under a bare verdict reaches 97.7\% (Table~\ref{tab:best-combo}),
-far above its 60--75\% range for the exact same task under a rubric strategy, while the
+Mistral judging its own code under a bare verdict reaches 97.8\% (Table~\ref{tab:best-combo}),
+far above its 59.7--66\% range for the exact same task under a rubric strategy, while the
 best math and science configurations top out over 25 points lower than that, regardless
 of which model or strategy is used. That domain gap, and the gap between Mistral's best
 and worst configurations on the same task, are what the following two sections trace to
@@ -336,84 +347,97 @@ Appendix~\ref{app:fullmap} instead averages over told-frame, so the same
 \subsection{Does Telling the Judge Who Wrote the Answer Change Its Verdict?}
 \label{sec:results-belief}
 
-The full map shows accuracy shifting with actual authorship far more than with the
-told label across most models (Appendix~\ref{app:fullmap}); the goal here was to
-pin down whether that shift reflects genuine self-preference, and if so, what drives it.
+Accuracy shifts with actual authorship far more than with the told label. Holding the told
+label at ``self'', DeepSeek loses 3.1 points when it is truly the author (71.6\% vs.\
+74.7\%), Qwen 5.3 points (68.2\% vs.\ 73.5\%) and Mistral 7.4 points (57.0\% vs.\ 64.4\%),
+while changing the label alone moves accuracy by under a point for every model
+(Table~\ref{tab:belief-reality}). Llama appears to be an exception, gaining 2.9 points on
+its own work---but that reverses once the two error directions are separated. Llama
+approves its own errors \emph{more} often (55.0\% vs.\ 50.9\% false approval); its accuracy
+advantage comes entirely from rejecting fewer correct answers. Self-preference is a
+false-approval phenomenon, and accuracy is the wrong instrument for seeing it.
 
-The data indicate that, for DeepSeek and Qwen, the main driver of accuracy was actual
-authorship rather than the stated label: DeepSeek's accuracy dropped by 3.4 points
-when the true author was itself (71.4\% vs.\ 74.8\%), and Qwen's dropped by 5.1 points
-(68.4\% vs.\ 73.5\%), while the stated label alone altered accuracy by less than one
-point for both (Table~\ref{tab:belief-reality}). The same pattern was observed for
-Mistral, albeit at a lower overall accuracy range (57.3\%--64.4\%) and with the
-largest reality gap among the models, 7.1 points (57.3\% vs.\ 64.4\%). Llama was an
-exception, exhibiting slightly more self-doubt than self-bias, gaining 2.9 points when
-it was actually the author (74.2\% vs.\ 71.3\%).
+The clean estimate holds the specific error fixed. Within a stratum of
+(item, generator, told frame, strategy), one judge is the author and up to three are not,
+so every judge is scored on the identical wrong answer. Across 6{,}969 such strata spanning
+779 distinct errors, the author approves at 63.0\% against 51.1\% for the others---a gap of
+\textbf{11.9 points} (95\% CI $[+10.4,+13.5]$, items resampled). The effect is not uniform:
+it is largest for Mistral's errors ($+33.4$ pp) and reverses for DeepSeek's ($-10.2$ pp),
+whose errors the other judges approve more readily than DeepSeek itself does. By contrast,
+the told label moves false approval by $-0.3$ pp on self-authored errors ($p=0.85$) and
+$-0.7$ pp on other-authored ones---small, and in the direction opposite to self-preference.
 
-To diagnose this effect, two hypotheses were formalized, one per probe: (1) verifiers
-prefer their own reasoning or logic, regardless of its correctness, and (2) verifiers
-recognize and favor their own prose style. To test the first hypothesis, DeepSeek and
-Qwen were presented with questions where both candidate answers were incorrect and
-generated by these same models; both models most often selected both as correct
-rather than exhibiting a self-selection pattern, with only a weak signal toward
-self-bias (6.6\% for DeepSeek, 12.7\% for Qwen; Table~\ref{tab:self-preference}). This
-weak signal ruled out a straightforward preference for one's own logic. To test the
-second hypothesis, a style-transfer probe was conducted by rewriting every candidate
-answer into a single common style before re-verification; the results showed a net
-false-positive-rate drop of just 0.2 points for DeepSeek and 1.5 points for Qwen
-(Table~\ref{tab:style-transfer}), effectively ruling out style as the driver. This
-leaves open the question of whether the effect instead reflects a real difference in
-the quality of answers generated by each model, rather than any property detectable
-by the verifier. Full probe methodology---exact prompts, item counts, and domain
-breakdowns---is reported in Appendix~\ref{app:framing}.
+Three probes test what drives the reality effect. \textbf{(i) Structural preference.}
+Presented with two incorrect candidates, one its own, DeepSeek picked its own 6.6\% of the
+time against 3.5\% for the other model's, and Qwen 12.7\% against 7.2\%
+(Table~\ref{tab:self-preference})---a consistent but small $\approx$1.8$\times$ preference,
+too weak to account for a 12-point gap. \textbf{(ii) Style.} Rewriting every candidate into
+another model's prose, against a placebo rewrite of equal length and disruption, moved
+false approval by $-0.2$ pp for DeepSeek (McNemar $p=0.93$) and $-1.5$ pp for Qwen
+($p=0.13$) (Table~\ref{tab:style-transfer}). Prose style is not the signal.
+\textbf{(iii) Self-recognition.} Asked to pick its own answer from four, no model exceeds
+chance once conclusion-matching is controlled for: in 9 of 12 model$\times$domain cells
+apparent recognition is explained entirely by the model selecting whatever answer matches
+the conclusion it originally reached, and a consistency control collapses the strongest
+mediation from $+22.2$ pp to $+2.8$ pp ($p=0.73$). What persists is the conclusion, not the
+authorship. Full probe methodology is in Appendix~\ref{app:framing}.
 
+\begingroup
+\setlength{\intextsep}{5pt plus 1pt minus 1pt}
+\setlength{\abovecaptionskip}{4pt}
+\setlength{\belowcaptionskip}{2pt}
+\renewcommand{\arraystretch}{0.95}
+\vspace{5pt}
 \begin{table}[H]
-\centering
-\small
-\caption{Belief-vs-reality accuracy (\%). Columns hold the told label fixed at
-``self''; rows compare actual authorship.}
+\centering\small
+\caption{Belief vs.\ reality, told label held at ``self''. Accuracy hides the effect;
+false approval reveals it. Llama's accuracy advantage on its own work comes from fewer
+false rejections, not from catching its own errors.}
 \label{tab:belief-reality}
-\begin{tabular}{lcc}
+\begin{tabular}{lcccc}
 \toprule
-Model & Told self / Actually self & Told self / Actually other \\
+& \multicolumn{2}{c}{Accuracy (\%)} & \multicolumn{2}{c}{False approval (\%)} \\
+\cmidrule(r){2-3}\cmidrule(l){4-5}
+Model & Actually self & Actually other & Actually self & Actually other \\
 \midrule
-DeepSeek & 71.4 & 74.8 \\
-Qwen     & 68.4 & 73.5 \\
-Mistral  & 57.3 & 64.4 \\
-Llama    & 74.2 & 71.3 \\
+DeepSeek & 71.6 & 74.7 & 61.0 & 36.2 \\
+Qwen     & 68.2 & 73.5 & 68.0 & 47.7 \\
+Llama    & 74.1 & 71.2 & 55.0 & 50.9 \\
+Mistral  & 57.0 & 64.4 & 64.1 & 68.3 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \begin{table}[H]
-\centering
-\small
-\caption{Self-preference probe: own-algorithm selection rate on both-wrong pairs.}
+\centering\small
+\caption{Structural self-preference on both-wrong pairs: rate of selecting one's own
+candidate vs.\ the other model's.}
 \label{tab:self-preference}
-\begin{tabular}{lc}
-\toprule
-Model & Self-selection rate \\
-\midrule
-DeepSeek & 6.6\% (40/608) \\
-Qwen     & 12.7\% (77/608) \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\begin{table}[H]
-\centering
-\small
-\caption{Style-transfer probe: false-positive rate before and after style-stripping.}
-\label{tab:style-transfer}
 \begin{tabular}{lccc}
 \toprule
-Model & Original FPR & Style-stripped FPR & Net drop \\
+Model & Picked own & Picked other & Ratio \\
 \midrule
-DeepSeek & 100.0\% & 85.2\% & 0.2 pp \\
-Qwen     & 100.0\% & 90.3\% & 1.5 pp \\
+DeepSeek & 6.6\% (40/608)  & 3.5\% (21/608) & 1.90$\times$ \\
+Qwen     & 12.7\% (77/608) & 7.2\% (44/608) & 1.75$\times$ \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\begin{table}[H]
+\centering\small
+\caption{Style-transfer probe. The causal estimate is style-stripped minus placebo; the
+drop from 100\% is a rewrite effect present in both arms, not a style effect.}
+\label{tab:style-transfer}
+\begin{tabular}{lcccc}
+\toprule
+Model & Original & Placebo rewrite & Style-stripped & Style effect \\
+\midrule
+DeepSeek & 100.0\% & 85.5\% & 85.2\% & $-0.2$ pp ($p=0.93$) \\
+Qwen     & 100.0\% & 91.8\% & 90.3\% & $-1.5$ pp ($p=0.13$) \\
+\bottomrule
+\end{tabular}
+\end{table}
+\endgroup
 
 \subsection{Does Verifier Reliability Track Model Capability?}
 \label{sec:results-detect}
@@ -425,7 +449,7 @@ ablation.
 
 Without an execution signal, a stronger generator's errors become harder to catch:
 item-adjusted approval of a generator's own errors rises with generator accuracy in
-both science ($-17.7$ to $+14.0$ points, $p<0.001$) and math ($-27.0$ to $+14.7$
+both science ($-17.2$ to $+14.5$ points, $p<0.001$) and math ($-26.6$ to $+14.8$
 points, $p<0.001$, non-monotonic---see Table~\ref{tab:detect-range} for the full
 domain breakdown); in code the same relationship is flat and
 non-significant ($p=0.064$) (Figure~\ref{fig:detectability}). Judges also fail
@@ -470,20 +494,50 @@ in Appendix~\ref{app:capability}.
 \section{Limitations and Future Directions}
 \label{sec:limitations}
 
-Our findings establish that when models evaluate other models, agreement is a poor substitute for environmental grounding. However, our experimental design leaves several avenues open for exploration. First, our methodology relies on static, single-turn prompting. We did not evaluate multi-turn agentic loops, which are necessary to understand how different combinations of verification strategies and authorship frames impact long-horizon, intricate agentic executions. Second, while the code domain benefited from a deterministic grounding mechanism (execution against test cases), equivalent environments were unavailable for mathematics and science. This restricted our ability to analyze how verifiers interact with noisy or partial environmental signals in non-code domains.
+Five constraints bound these results. First, the design is single-turn: we do not evaluate
+multi-turn agentic loops, where a verifier's judgment feeds back into generation. Second,
+only code verifications were grounded. Mathematics has a checkable final answer that we
+deliberately withheld from the judge, so the grounded/ungrounded contrast is a property of
+our design rather than of the domains, and we cannot say how verifiers behave under noisy
+or partial signals. Third, correctness in the code domain is defined by the same execution
+result the judge is shown, so code accuracy partly measures whether a judge reads that
+signal off correctly rather than independent code comprehension; the code prompt also
+explicitly permits overriding execution, which inflates override rates relative to a
+neutral instruction. Fourth, the differential fuzzer that adjudicates disputed overrides
+relies on an LLM oracle we do not independently validate, and searches a bounded set of
+generated inputs per case, so \texttt{NO\_DISCREPANCY} means no divergence was found rather
+than that none exists. Finally, one of the four judges is a 12B model against three
+70B-class models, and it produced 262 of the 277 unparsed verdicts, so any model-level
+ranking confounds capability with scale and with differential attrition.
 
-These limitations point toward several critical directions for future research. Expanding grounding mechanisms to new domains---such as integrating formal provers for math or retrieval pipelines for science---could reveal distinct verification patterns, ultimately paving the way for specialized, domain-specific verifiers. Additionally, to maximize the effectiveness of these verifiers in complex workflows, future systems should explore dynamic \textbf{prompt combo routing}. By adaptively routing tasks to the optimal combination of ownership framing and verification strategy (e.g., CoT vs.\ Rubric) based on the context, pipelines can deploy the most effective critique mechanism at each step. Finally, because current judges share correlated vulnerabilities on ungrounded tasks, future research must explore training paradigms that deliberately decorrelate judges---equipping models with intentionally different blind spots so that ensembling actually improves reliability.
+These point to three directions. Extending grounding to new domains---formal provers for
+mathematics, retrieval pipelines for science---would convert our cross-domain contrast into
+a within-domain ablation and show how verifiers handle partial or noisy signals. Because
+judges share correlated blind spots precisely where grounding is absent, training paradigms
+that deliberately decorrelate judges are more promising than larger panels drawn from the
+same distribution. And because self-preference tracks the conclusion a model still holds
+rather than the text it wrote, interventions that perturb a verifier's prior---re-deriving
+the answer independently before judging, or verifying against a conclusion the judge did
+not produce---are better targets than authorship blinding.
 
 \section{Conclusion}
 \label{sec:conclusion}
 
-In this work, we demonstrate that agreement is not verification. Current LLM-as-a-judge paradigms rely on the flawed assumption that larger panels, stronger models, or varied prompting strategies can reliably reason their way to ground truth. Our results show that without an environmental signal, LLM juries routinely fail together. Furthermore, attempts to debias judges by blinding them to authorship are ineffective. We find that models are largely indifferent to the \emph{told} frame of ownership (varying by less than 1 percentage point), yet exhibit deep, structural biases---such as belief persistence---toward their \emph{actual} generations. 
-
-Ultimately, reliable verification requires the environment, not just another model. Our code domain analysis reveals that deterministic execution is a far stronger anchor than model consensus. When LLM verifiers override a passing test suite, our differential fuzzing shows they are unjustified in doing so 77\% of the time. This proves that a model's internal logic is highly unreliable when it contradicts objective ground truth. The path forward for autonomous agents does not lie in engineering more complex LLM juries, but in developing verifiable environments and aligning models to trust deterministic feedback over their own flawed priors.
+Agreement is not verification. Across 64{,}800 verifications, judges without an
+environmental signal fail together rather than independently, a stronger generator's errors
+are correspondingly harder for any of them to catch, and no verification strategy closes
+the gap---so larger panels and better prompting do not deliver what they promise. Blinding
+judges to authorship misses as well: models are nearly indifferent to the \emph{told} frame,
+varying by under one percentage point, yet approve their own errors 11.9 points more often
+when they truly wrote them. That gap survives a placebo-controlled style transfer and
+dissolves under a consistency control, so what persists is the conclusion a model still
+holds, not recognition of its own prose. Reliable verification therefore requires the
+environment---though not blind trust in the judge reading it, since verifiers that override
+a passing test suite are unjustified in at least 77\% of cases and confirmed in only 7.3\%.
+The path forward is verifiable environments, and judges aligned to defer to them.
 \FloatBarrier
-\section*{References}
-{\small
 \begin{thebibliography}{11}
+\small
 
 \bibitem[Bai et al.(2022)]{bai2022constitutional}
 Y.~Bai, S.~Kadavath, S.~Kundu, A.~Askell, et~al.
@@ -549,8 +603,7 @@ L.~Zheng, W.-L. Chiang, Y.~Sheng, S.~Zhuang, Z.~Wu, Y.~Zhuang, Z.~Lin, Z.~Li, D.
 \newblock In \emph{NeurIPS 2023 Datasets and Benchmarks Track}, 2023.
 
 \end{thebibliography}
-}
-
+\appendix
 \section{Execution Harness and Differential Fuzzer}
 \label{app:execution}
 
