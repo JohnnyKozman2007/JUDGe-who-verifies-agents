@@ -63,11 +63,11 @@
 \usepackage{graphicx}
 \usepackage{float}
 \usepackage{placeins}
+\usepackage{enumitem}       % for itemize [nosep] in metrics
 % Note. For the workshop paper template, both \title{} and \workshoptitle{} are required, with the former indicating the paper title shown in the title and the latter indicating the workshop title displayed in the footnote. 
 \graphicspath{{../plots/}{plots/}{./}}
-
-\title{Agreement Is Not Verification:\\
-Why LLM Judges Need the Environment, Not Each Other}
+\newcommand{\justification}[1]{#1}
+\title{Neither Blinding Nor a Jury, Neither Capability Nor Strategy: What Brings a Verifier to Reliability}
 
 
 % The \author macro works with any number of authors. There are two commands
@@ -100,26 +100,26 @@ Why LLM Judges Need the Environment, Not Each Other}
 
 
 \begin{abstract}
-  %The abstract paragraph should be indented \nicefrac{1}{2}~inch (3~picas) on both the left- and right-hand margins. Use 10~point type, with a vertical spacing (leading) of 11~points. The word \textbf{Abstract} must be centered, bold, and in point size 12. Two line spaces precede the abstract. The abstract must be limited to one paragraph.%
   Agent pipelines increasingly close the loop with an LLM verifier: one model judges
   whether another's output is correct, and that judgment gates deployment, training, or
   search. We report a controlled study of that judgment across 64{,}800 verification
   calls, crossing four models as both generators and verifiers with three authorship
   frames and three verification strategies over three task domains. Two fixes commonly
-  proposed for unreliable LLM judges both fail. The first is to blind the judge to
-  authorship. Self-preference is real, but it is not about the self: telling a model it
-  wrote an answer changes nothing, while a model that genuinely wrote it approves its own
-  errors 12 percentage points more often. Nor is that gap self-recognition---rewriting an
-  answer into another model's prose leaves the verdict unmoved, and in 9 of 12
-  model$\times$domain cells what looks like recognition is a model agreeing with its own
-  earlier conclusion rather than identifying its own writing. Self-preference is belief
-  persistence, so blinding cannot remove it. The second fix is a better or larger panel.
-  Errors from stronger generators are systematically harder to catch---the same direction
-  in all three domains---and no verification strategy narrows the gap; where the task
-  admits no executable check, judges fail together rather than independently, so adding
-  judges buys nothing. Only an environment signal changes the picture, and even then
-  judges contradict that signal on one call in eight, with differential testing supporting
-  fewer than one in ten of those contradictions. The binding constraint on agent
+  proposed for unreliable LLM judges both fail, and the failures are sharper than
+  intuition suggests. The first is to blind the judge to authorship. Self-preference is
+  real, but it is not about the self: telling a model it wrote an answer moves false
+  approval by under a point, while a model that \emph{actually} wrote the answer
+  approves its own errors 11.9 percentage points more often---nearly all of the effect
+  comes from the fact of authorship, essentially none from the belief of it. Nor is
+  that gap self-recognition---rewriting an answer into another model's prose leaves the
+  verdict unmoved. Self-preference is belief persistence, so blinding cannot remove it.
+  The second fix is a better or larger panel. Errors from stronger generators are
+  systematically harder to catch---the same direction in all three domains---and no
+  verification strategy narrows the gap; where the task admits no executable check,
+  judges fail together rather than independently, so adding judges buys nothing. Only
+  an environment signal changes the picture, and even then judges override that signal
+  on roughly one in ten calls, with independent differential testing confirming fewer
+  than one in ten of those overrides as justified. The binding constraint on agent
   verification is the signal the environment can supply, not the model reading it.
 \end{abstract}
 
@@ -161,7 +161,7 @@ over 450 items.
 Self-preference survives the intervention aimed at it, because that intervention targets
 the wrong mechanism. Telling a model it wrote an answer moves false approval by under a
 percentage point, in the direction opposite to self-preference, while a model that
-\emph{actually} wrote the answer approves its own errors twelve points more often, holding
+\emph{actually} wrote the answer approves its own errors 11.9 percentage points more often, holding
 the error fixed. Nor is that gap self-recognition: rewriting an answer into another
 model's prose, against a placebo rewrite, leaves the verdict unmoved, and in almost every
 model and domain we test, apparent recognition dissolves once we control for the model
@@ -176,11 +176,12 @@ Errors from stronger generators are systematically harder to catch, in the same 
 in all three domains, and no strategy narrows the gap; where no mechanical check exists,
 judges fail together rather than independently, so a panel inherits a shared blind spot
 instead of averaging it away. What changes the picture is a signal from the environment
-rather than a better model reading the answer: judge accuracy runs at 87.5\% where the
-judge is shown an execution result, against 57\% to 65\% where it must judge unaided, and
+rather than a better model reading the answer: judge accuracy runs at 87.7\% where the
+judge is shown an execution result, against 57.2\%--64.5\% where it must judge unaided
+(Appendix~\ref{app:capability}), and
 the correlation between judges' errors disappears in the grounded case. Even then the
-judge is not the source of that reliability---it contradicts the runtime result on one
-call in eight, and independent differential testing supports fewer than one in ten of
+judge is not the source of that reliability---it contradicts the runtime result on
+roughly one in ten calls, and independent differential testing supports fewer than one in ten of
 those contradictions.
 
 \paragraph{Contributions.}
@@ -190,10 +191,7 @@ transfer, structural preference, and self-recognition with a consistency control
 jointly rule out self-recognition as the mechanism behind self-preference. (iii) Evidence
 that error detectability falls with generator strength and that judge failures are
 correlated, which together explain why stronger judges, better prompts and larger panels
-all fail on ungrounded tasks. (iv) Evidence that the binding constraint on agent
-verification is the signal the environment supplies, not the judge reading it. We release
-all prompts, code, and the 64{,}800 verification traces.
-
+all fail on ungrounded tasks. (iv) Evidence that the binding constraint on agent verification is the signal the environment supplies, not the judge reading it. We release all prompts, code, and the 64{,}800 verification traces in an anonymized repository for review: \url{https://anonymous.4open.science/r/JUDGe-who-verifies-agents-6A34/}.
 \paragraph{Related work.}
 LLM-as-a-judge evaluation is now standard practice, alongside a catalogue of its failure
 modes: position and verbosity bias~\citep{zheng2023judging,wang2023fair}, and a preference
@@ -213,15 +211,18 @@ attribute reliability to grounding rather than to judge capability.
 
 \paragraph{Tasks.} We draw 150 items from each of three benchmarks with a fixed sampling
 seed: HumanEval+~\citep{liu2023evalplus} for code, MATH~\citep{hendrycks2021math} for
-mathematics, and GPQA-Diamond~\citep{rein2024gpqa} for graduate-level science. The domains
+mathematics, and GPQA-Diamond~\citep{rein2024gpqa} for graduate-level science.
+\footnote{HumanEval+ is distributed under the MIT License; MATH under CC BY-NC-SA 4.0; GPQA-Diamond under the MIT License. All assets are used strictly for academic evaluation.} The domains
 are chosen not for difficulty but for what the environment can verify, and Table~\ref{tab:domains}
 records the distinction the paper turns on. Correctness is established by running the
 candidate in code, by matching a final answer in mathematics, and by a multiple-choice
 letter in science---but only in code does any of that reach the judge. Mathematics is
 therefore a checkable task presented to an unaided judge, which separates
-\emph{grounding} from \emph{checkability}. Science options are shuffled per item under a
-fixed seed and rendered as A--D; items whose options fail a validity check are discarded
-before sampling.
+\emph{grounding} from \emph{checkability}. For science items specifically, the four candidate options from GPQA-Diamond are
+shuffled per item under a fixed seed (seed~42) and rendered as A--D before the
+question is presented to either generator or verifier. Items whose options fail
+a validity check (empty option, duplicate option, or malformed label set) are
+discarded before the 150-item sample is drawn.
 
 \begin{table}[H]
   \caption{The three domains differ in whether a mechanical check exists and, separately,
@@ -242,8 +243,7 @@ before sampling.
 
 \paragraph{Models.} Four instruction-tuned models act as both generators and verifiers:
 Qwen2.5-72B-Instruct, DeepSeek-V3, Llama-3.3-70B-Instruct-Turbo, and
-Mistral-Nemo-Instruct-2407. All are served through a single inference provider at
-temperature~0. The pool deliberately spans a wide capability range, from a 12B dense model
+Mistral-Nemo-Instruct-2407. All are served through DeepInfra at temperature~0. The pool deliberately spans a wide capability range, from a 12B dense model
 to a 671B-parameter mixture of experts; \S\ref{sec:results-detect} exploits that spread,
 and \S\ref{sec:limitations} notes it as a confound for any model-level ranking.
 
@@ -272,16 +272,37 @@ permission is deliberate: it makes judge-initiated deviation from the environmen
 differential fuzzer used to adjudicate disputed overrides are described in
 Appendix~\ref{app:execution}.
 
-\paragraph{Verdicts and metrics.} Verifiers return JSON and a verdict is read from a single
-boolean field, with fallbacks for fenced or prefixed output. Of 64{,}800 calls, 277
-(0.43\%) never yielded a parseable verdict and are dropped; all of them come from the two
-reasoning strategies, and 262 from the smallest model. Approving an incorrect answer is a
-\emph{false approval} and rejecting a correct one a \emph{false rejection}. We report raw
-accuracy for comparability with prior work but treat balanced accuracy as primary: the rate
-at which a judge catches errors is maximised by rejecting everything, and raw accuracy is
-inflated wherever one class dominates---both failure modes we document in
-\S\ref{sec:results-detect}. Items are the independent unit throughout, and every confidence
-interval resamples items rather than verification calls.
+\paragraph{Verdicts and metrics.}
+Verifiers return JSON; a verdict is read from a single boolean \texttt{is\_correct}
+field, with fallback regex recovery for fenced or escaped output
+(see Appendix~\ref{app:prompts}). Of 64{,}800 calls, 277 (0.43\%) never yielded
+a parseable verdict and are dropped; all come from the two reasoning strategies,
+and 262 of those from the smallest model (Mistral-Nemo).
+
+We report the following metrics, computed at the item level throughout:
+
+\begin{itemize}[nosep]
+  \item \textbf{Accuracy} (\%): proportion of verdicts matching the ground-truth
+    correctness label (correct candidate $\to$ approved; incorrect candidate
+    $\to$ rejected).
+  \item \textbf{Balanced accuracy}: arithmetic mean of true-positive rate (TPR,
+    sensitivity) and true-negative rate (TNR, specificity),
+    $\tfrac{1}{2}(\mathrm{TPR}+\mathrm{TNR})$. This is our \emph{primary metric}.
+  \item \textbf{False-positive rate (FPR)} / \textbf{false-approval rate}: rate
+    at which incorrect candidates are approved ($\mathrm{FP}/(\mathrm{FP}+\mathrm{TN})$).
+  \item \textbf{False-negative rate (FNR)} / \textbf{false-rejection rate}: rate
+    at which correct candidates are rejected ($\mathrm{FN}/(\mathrm{FN}+\mathrm{TP})$).
+  \item \textbf{Item-adjusted approval rate} (used in \S\ref{sec:results-detect}
+    only): within-item demeaned false-approval rate, which removes item-difficulty
+    as a confound when comparing generators. See Appendix~\ref{app:capability}
+    for the exact estimator.
+\end{itemize}
+
+Raw accuracy is reported for comparability with prior work, but balanced
+accuracy is our primary metric throughout: raw accuracy is distorted whenever
+class balance varies, and raw catch rate trivially rewards rejecting everything.
+All bootstrap confidence intervals resample items rather than individual
+verification calls as the independent unit.
 
 \section{Results}
 \label{sec:results}
@@ -310,6 +331,11 @@ Math    & DeepSeek & Neutral & Rubric & 69.2\% \\
 Science & DeepSeek & Other   & CoT    & 65.8\% \\
 \bottomrule
 \end{tabular}
+\vspace{2pt}
+{\footnotesize Note: this table reports each domain's single best (told-frame,
+strategy) cell at fixed actual authorship; Table~\ref{tab:fullmap-code} in
+Appendix~\ref{app:fullmap} instead averages over told-frame, so the same
+(verifier, strategy) pair can show a different number in each table.}
 \end{table}
 
 \subsection{Does Telling the Judge Who Wrote the Answer Change Its Verdict?}
@@ -404,8 +430,9 @@ ablation.
 
 Without an execution signal, a stronger generator's errors become harder to catch:
 item-adjusted approval of a generator's own errors rises with generator accuracy in
-science and math ($p<0.001$ each), from roughly $-18$ points at the weakest generator
-to $+15$ points at the strongest; in code the same relationship is flat and
+both science ($-17.7$ to $+14.0$ points, $p<0.001$) and math ($-27.0$ to $+14.7$
+points, $p<0.001$, non-monotonic---see Table~\ref{tab:detect-range} for the full
+domain breakdown); in code the same relationship is flat and
 non-significant ($p=0.064$) (Figure~\ref{fig:detectability}). Judges also fail
 together rather than independently in ungrounded domains---mean pairwise agreement is
 $\kappa=+0.35$ in science and $+0.45$ in math, against $+0.09$ in code, and wrong
@@ -528,6 +555,306 @@ L.~Zheng, W.-L. Chiang, Y.~Sheng, S.~Zhuang, Z.~Wu, Y.~Zhuang, Z.~Lin, Z.~Li, D.
 
 \end{thebibliography}
 }
+
+\section{Execution Harness and Differential Fuzzer}
+\label{app:execution}
+
+\subsection{Code Execution Harness}
+To provide environmental grounding for the code domain (HumanEval+), we execute each generated candidate against the benchmark's provided test suite. Executions are isolated using Python's \texttt{subprocess} module with strict resource limits, including a 5-second timeout to prevent infinite loops and memory constraints to prevent out-of-memory crashes. 
+
+During execution, the harness captures a comprehensive set of runtime signals: the system exit code, standard output (\texttt{stdout}), standard error (\texttt{stderr}), the number of passing assertions before failure, and the final traceback frame if an exception occurs. To ensure the LLM verifier can interpret this environment signal, we append a structured execution block to the prompt. The exact block shown to the verifier is formatted as follows:
+
+\begin{quote}
+\small\ttfamily
+--- EXECUTION RESULTS ---\\
+Status: [Passed / Failed / Timeout / Syntax Error]\\
+Exit Code: [0 / 1 / etc.]\\
+Assertions Passed: [X / Total]\\[4pt]
+{[}If Failed, Output/Traceback is included here:{]}\\
+Traceback (most recent call last):\\
+...\\
+AssertionError: expected [X], got [Y]
+\end{quote}
+
+The prompt explicitly states that this block is a runtime signal, and permits the judge to mark a passing code block as incorrect if it identifies a logical flaw not covered by the tests. This design makes judge-initiated overrides observable.
+
+\subsection{Differential Fuzzing for Overrides}
+Because LLM verifiers are permitted to override the execution signal, we require a mechanism to determine whether an override of a \emph{passing} test suite is justified (a genuine edge case missed by the test harness) or a hallucination (an unjustified false rejection). We evaluate these cases using differential fuzzing.
+
+When a verifier rejects a candidate that passed the test suite, the fuzzer generates a large volume of mutated, randomized inputs matching the function signature. It executes both the candidate solution and the gold reference solution on these inputs, looking for behavioral differences. The fuzzer categorizes the overrides into three distinct verdicts:
+
+\begin{itemize}
+    \item \textbf{\texttt{BUG\_CONFIRMED}:} The fuzzer discovered an input where the candidate's output diverged from the reference output. The test suite was incomplete, and the LLM verifier was \emph{correct} to override it.
+    \item \textbf{\texttt{REFERENCE\_BUG}:} A discrepancy was found, but manual inspection revealed that the candidate's behavior was actually mathematically or logically correct, and the benchmark's gold reference was flawed.
+    \item \textbf{\texttt{NO\_DISCREPANCY}:} The fuzzer exhausted its mutation budget (thousands of inputs) without finding any divergence between the candidate and the reference. The LLM verifier's override was a hallucination and is deemed \emph{incorrect}.
+\end{itemize}
+
+\paragraph{Fuzzing Results and Reference Bugs.} 
+Across our code domain experiments, verifiers generated 1,856 overrides (rejecting code that passed the test suite). Differential fuzzing revealed that the vast majority of these judge interventions were unjustified. Specifically, \textbf{77.0\%} of overrides resulted in \texttt{NO\_DISCREPANCY}, meaning the judge hallucinated a flaw in logically sound code. Only \textbf{9.0\%} were \texttt{BUG\_CONFIRMED}, where the judge correctly identified a flaw missed by the tests. 
+
+An additional \textbf{0.8\%} of overrides were flagged as \texttt{REFERENCE\_BUG}s (with the remaining 9.1\% skipped due to fuzzer timeouts or parsing errors). Notably, the fuzzer identified subtle flaws in the benchmark's own reference solutions for specific items (e.g., \texttt{code\_HumanEval\_126}), demonstrating that while environmental grounding is highly reliable, even gold-standard test suites contain blind spots that rigorous differential testing can expose.
+
+\section{Verification Prompts}
+\label{app:prompts}
+
+All prompts are assembled by \texttt{src/prompts.py} in the repository.
+The prompt has four components concatenated in order: (1) the question/task,
+(2) the ownership-frame sentence, (3) domain-specific evaluation criteria,
+and (4) strategy-specific output instructions.
+
+\subsection{Ownership Frame Sentences}
+\label{app:prompts:frames}
+
+The three frames differ only in a single sentence inserted after the question.
+No model name is revealed in any frame.
+
+\begin{description}
+  \item[\textsc{Neutral}]
+    \texttt{Here is a candidate answer to the question:}
+  \item[\textsc{Self}]
+    \texttt{You wrote the following candidate answer to the question:}
+  \item[\textsc{Other}]
+    \texttt{Another model wrote the following candidate answer to the question:}
+\end{description}
+
+In all three cases the candidate answer is then wrapped in
+\verb|<candidate_answer>...</candidate_answer>| tags.
+
+\subsection{Domain-Specific Evaluation Criteria}
+\label{app:prompts:criteria}
+
+After the frame sentence, the prompt appends two shared instructions followed
+by domain-specific criteria:
+
+\textbf{Shared (all domains):}
+\begin{enumerate}
+  \item DO NOT re-solve the problem from scratch. ONLY evaluate the candidate's existing logic.
+  \item Do not assume the answer is correct just because it looks plausible at a glance. Verify the logic rigorously.
+\end{enumerate}
+
+\textbf{Code (criteria 3--5):}
+\begin{enumerate}[start=3]
+  \item Mentally dry-run the candidate's code using a simple hypothetical test case to trace its logic.
+  \item Specifically look for common pitfalls: boundary condition errors, missing imports, infinite loops, variable shadowing, and unhandled null/empty inputs.
+  \item Ensure the code strictly adheres to the prompt's constraints.
+\end{enumerate}
+
+\textbf{Math (criteria 3--4):}
+\begin{enumerate}[start=3]
+  \item Verify the mathematical soundness of each calculation step.
+  \item Ensure the final answer is derived correctly and is stated in a single \texttt{<answer></answer>} tag.
+\end{enumerate}
+
+\textbf{Science (criteria 3--4):}
+\begin{enumerate}[start=3]
+  \item Verify the factual accuracy of the candidate's scientific reasoning.
+  \item Check whether the candidate stated exactly one final option (A, B, C, or D) in a `FINAL ANSWER: <letter>' line, and whether that option follows from its reasoning.
+\end{enumerate}
+
+\noindent\textit{Note on science criterion 4:} this criterion is deliberately
+evaluative rather than directive (it does not say ``mark incorrect if the letter
+is missing''), to avoid pushing the science false-positive rate down for
+prompt-structural reasons rather than verifier reasons, which would contaminate
+the cross-domain comparison.
+
+\subsection{Strategy-Specific Output Instructions}
+\label{app:prompts:strategy}
+
+\textbf{\textsc{Direct}:} The judge is told to apply the evaluation criteria
+above, then give a verdict with no written reasoning. Output must be a JSON
+object with a single boolean key:
+\begin{quote}\ttfamily
+\{"is\_correct": true\} \textrm{ or } \{"is\_correct": false\}
+\end{quote}
+
+\textbf{\textsc{CoT}:} The judge works through the criteria step by step
+(maximum 3--4 sentences), then gives a verdict. Output is a JSON object with
+two keys, opened immediately with \verb|{| (no preamble):
+\begin{quote}\ttfamily
+\{"thinking": "<brief analysis>", "is\_correct": true\}
+\end{quote}
+For science and math items, an additional instruction prohibits LaTeX
+backslash sequences inside JSON string values to prevent parse failures
+(backslash-escaped Greek letters caused 46\% of observed science JSON parse
+failures; LaTeX math delimiters caused a further 70.9\%).
+
+\textbf{\textsc{Rubric}:} The judge scores the candidate against the
+evaluation criteria as a rubric (maximum 3--4 sentences), then gives a verdict.
+Output format is identical to \textsc{CoT}. The distinction from \textsc{CoT}
+is the framing: \textsc{CoT} asks for step-by-step reasoning; \textsc{Rubric}
+asks for criterion-by-criterion scoring.
+
+\subsection{Verdict Parsing and Fallback}
+
+Verdicts are extracted from the \texttt{is\_correct} field of the returned JSON.
+If strict JSON parsing fails (the most common cause being unescaped backslashes
+in science/math \textsc{CoT} and \textsc{Rubric} responses), a regex fallback
+recovers the value from patterns of the form
+\texttt{is\_correct\,:\,true/false}. Calls where neither method yields a
+parseable verdict (277 of 64{,}800; 0.43\%) are dropped from all analyses.
+
+\section{Capability and Grounding: Full Breakdown}
+\label{app:capability}
+
+\subsection*{A note on unadjusted vs.\ item-adjusted rates}
+
+Two approval-rate quantities appear in the detectability analysis.
+The \emph{unadjusted} false-approval rate for a (generator, verifier) pair is
+the raw fraction of that generator's incorrect answers that the verifier approves,
+aggregated across all items. It conflates error difficulty with verifier
+sensitivity: a generator that tends to produce errors on hard items will appear
+harder to catch regardless of what the verifier does.
+
+The \emph{item-adjusted} rate removes that confound by demeaning within each
+item: for every wrong answer to item $i$, we subtract the mean approval rate
+across all generators on item $i$ before aggregating. Formally, let
+$a_{g,v,i} \in \{0,1\}$ be the approval indicator for generator $g$'s wrong
+answer to item $i$ by verifier $v$ (self-verification excluded). The item-adjusted
+rate for generator $g$ is
+\[
+  \hat{r}_g = \frac{1}{|I_g|} \sum_{i \in I_g}
+    \bigl(a_{g,\cdot,i} - \bar{a}_{\cdot,\cdot,i}\bigr),
+\]
+where $\bar{a}_{\cdot,\cdot,i}$ is the mean approval on item $i$ across all
+eligible (generator, verifier) pairs. All bootstrap confidence intervals
+resample items. The unadjusted rates are reported in the full breakdown CSVs
+in the repository; the main text and Figure~\ref{fig:detectability} use
+item-adjusted rates throughout.
+
+\subsection{Overall Accuracy by Grounding Condition}
+
+\begin{table}[H]
+\centering
+\small
+\caption{Overall raw verifier accuracy by domain, aggregated across all models,
+frames, and strategies. Only code carries an execution signal.}
+\label{tab:grounding-accuracy}
+\begin{tabular}{lcc}
+\toprule
+Domain & Grounded? & Accuracy \\
+\midrule
+Code    & Yes & 87.7\% \\
+Math    & No  & 64.5\% \\
+Science & No  & 57.2\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Item-Adjusted Approval Range by Domain}
+
+\begin{table}[H]
+\centering
+\small
+\caption{Item-adjusted approval of a generator's own errors: minimum and maximum
+values across the generator-accuracy range shown in Figure~\ref{fig:detectability}.}
+\label{tab:detect-range}
+\begin{tabular}{lccc}
+\toprule
+Domain & Min (weakest generator) & Max & $p$-value \\
+\midrule
+Science & $-17.7$ pp & $+14.0$ pp & $<0.001$ \\
+Math    & $-27.0$ pp & $+14.7$ pp$^\dagger$ & $<0.001$ \\
+Code    & $-3.7$ pp  & $+2.3$ pp  & $0.064$ \\
+\bottomrule
+\end{tabular}
+\vspace{2pt}
+{\footnotesize $^\dagger$Math is non-monotonic: approval peaks at the middle
+generator-accuracy range and falls back to $+4.4$ pp at the strongest generator.}
+\end{table}
+
+\subsection{Probe Methodology: Does Stronger Generation Produce Harder-to-Catch Errors?}
+
+This probe asks three linked questions using the same underlying item pool: whether a
+stronger generator's errors are systematically harder for a verifier to catch, whether
+that gap is explained by judge capability rather than the error itself, and whether
+combining multiple judges recovers the reliability that any single judge lacks. All
+three questions are evaluated across all four models, in all three domains, over the
+full main-grid item set (150 items per domain).
+
+The design isolates the specific error being judged, not just the generator or the
+item. For every wrong candidate answer, self-verification (a model judging its own
+output) is excluded, since a model approving its own error would mechanically inflate
+that generator's apparent undetectability rather than reflect a real property of the
+error. Detectability is then measured within each item: for a fixed question, how
+often is a strong generator's wrong answer caught relative to a weak generator's wrong
+answer to that same question, which removes item difficulty as a confound by
+construction rather than by statistical adjustment.
+
+The oversight question reuses this same error-fixed frame to ask whether a stronger
+judge model actually catches more errors than a weaker one, holding the specific wrong
+answer constant across every judge that sees it. The ensemble question sweeps every
+majority-vote threshold ($k$ of 3 judges must approve) rather than assuming a single
+fixed rule, and reports two separate judge pools: a leave-one-out pool, where the
+three judges are always the three models that did not write the candidate being
+judged, and a full four-judge pool, used only where all four models are needed to
+evaluate a combination. Balanced accuracy, not raw error-catch rate, is the primary
+metric throughout this probe, since raw catch rate is maximized by a judge that
+rejects every answer regardless of correctness.
+
+\begin{table}[H]
+\centering
+\small
+\caption{Detectability/oversight/ensemble probe design summary.}
+\label{tab:detect-design}
+\begin{tabular}{ll}
+\toprule
+Models (as both generator and judge) & DeepSeek, Qwen, Llama, Mistral \\
+Domains & Code, math, science \\
+Items per domain & 150 \\
+Self-verification rows & Excluded \\
+Detectability comparison unit & Item-stratified (same question, varying generator) \\
+Ensemble judge pools & Leave-one-out (3 judges) and full (4 judges) \\
+Primary ensemble metric & Balanced accuracy \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+\subsection{Ensemble Voting}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.7\textwidth]{figures/1_k_of_n_sweep.png}
+\caption{Balanced accuracy vs.\ ensemble threshold $k$ (of 3 judges), by domain and
+verification strategy. Dotted lines mark the best single judge.}
+\label{fig:k-sweep}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.7\textwidth]{figures/3_kappa_vs_gain.png}
+\caption{Cross-validated ensemble gain over the best single judge vs.\ mean pairwise
+Cohen's $\kappa$ among judges ($r=-0.59$, $p=0.098$, $n=9$ domain$\times$strategy
+cells).}
+\label{fig:kappa-gain}
+\end{figure}
+
+\subsection{Judge Agreement}
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/2_kappa_heatmap.png}
+\caption{Pairwise Cohen's $\kappa$ between judges, by domain. Mean $\kappa$: science
+$+0.35$, math $+0.45$, code $+0.09$.}
+\label{fig:kappa-heatmap}
+\end{figure}
+
+\subsection{Oversight}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.6\textwidth]{figures/2_sign_test_scatter.png}
+\caption{Stronger-judge vs.\ weaker-judge catch rate on the same errors. 10 of 18
+pairs fall above the diagonal (chance $=50\%$).}
+\label{fig:oversight}
+\end{figure}
+
+\subsection{Catch Rate vs.\ Balanced Accuracy}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{figures/4_metric_validity.png}
+\caption{Raw error-catch rate vs.\ balanced accuracy, by domain. Rankings disagree
+in code, motivating balanced accuracy as the primary metric throughout.}
+\label{fig:metric-validity}
+\end{figure}
+
 \section{Full Accuracy Map}
 \label{app:fullmap}
 
@@ -781,142 +1108,6 @@ Qwen     & 68.4 & 73.5 & 68.8 & 73.7 \\
 \bottomrule
 \end{tabular}
 \end{table}
-
-\section{Capability and Grounding: Full Breakdown}
-\label{app:capability}
-
-\subsection{Probe Methodology: Does Stronger Generation Produce Harder-to-Catch Errors?}
-
-This probe asks three linked questions using the same underlying item pool: whether a
-stronger generator's errors are systematically harder for a verifier to catch, whether
-that gap is explained by judge capability rather than the error itself, and whether
-combining multiple judges recovers the reliability that any single judge lacks. All
-three questions are evaluated across all four models, in all three domains, over the
-full main-grid item set (150 items per domain).
-
-The design isolates the specific error being judged, not just the generator or the
-item. For every wrong candidate answer, self-verification (a model judging its own
-output) is excluded, since a model approving its own error would mechanically inflate
-that generator's apparent undetectability rather than reflect a real property of the
-error. Detectability is then measured within each item: for a fixed question, how
-often is a strong generator's wrong answer caught relative to a weak generator's wrong
-answer to that same question, which removes item difficulty as a confound by
-construction rather than by statistical adjustment.
-
-The oversight question reuses this same error-fixed frame to ask whether a stronger
-judge model actually catches more errors than a weaker one, holding the specific wrong
-answer constant across every judge that sees it. The ensemble question sweeps every
-majority-vote threshold ($k$ of 3 judges must approve) rather than assuming a single
-fixed rule, and reports two separate judge pools: a leave-one-out pool, where the
-three judges are always the three models that did not write the candidate being
-judged, and a full four-judge pool, used only where all four models are needed to
-evaluate a combination. Balanced accuracy, not raw error-catch rate, is the primary
-metric throughout this probe, since raw catch rate is maximized by a judge that
-rejects every answer regardless of correctness.
-
-\begin{table}[H]
-\centering
-\small
-\caption{Detectability/oversight/ensemble probe design summary.}
-\label{tab:detect-design}
-\begin{tabular}{ll}
-\toprule
-Models (as both generator and judge) & DeepSeek, Qwen, Llama, Mistral \\
-Domains & Code, math, science \\
-Items per domain & 150 \\
-Self-verification rows & Excluded \\
-Detectability comparison unit & Item-stratified (same question, varying generator) \\
-Ensemble judge pools & Leave-one-out (3 judges) and full (4 judges) \\
-Primary ensemble metric & Balanced accuracy \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-
-\subsection{Ensemble Voting}
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.7\textwidth]{figures/1_k_of_n_sweep.png}
-\caption{Balanced accuracy vs.\ ensemble threshold $k$ (of 3 judges), by domain and
-verification strategy. Dotted lines mark the best single judge.}
-\label{fig:k-sweep}
-\end{figure}
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.7\textwidth]{figures/3_kappa_vs_gain.png}
-\caption{Cross-validated ensemble gain over the best single judge vs.\ mean pairwise
-Cohen's $\kappa$ among judges ($r=-0.59$, $p=0.098$, $n=9$ domain$\times$strategy
-cells).}
-\label{fig:kappa-gain}
-\end{figure}
-
-\subsection{Judge Agreement}
-\begin{figure}[H]
-\centering
-\includegraphics[width=\textwidth]{figures/2_kappa_heatmap.png}
-\caption{Pairwise Cohen's $\kappa$ between judges, by domain. Mean $\kappa$: science
-$+0.35$, math $+0.45$, code $+0.09$.}
-\label{fig:kappa-heatmap}
-\end{figure}
-
-\subsection{Oversight}
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.6\textwidth]{figures/2_sign_test_scatter.png}
-\caption{Stronger-judge vs.\ weaker-judge catch rate on the same errors. 10 of 18
-pairs fall above the diagonal (chance $=50\%$).}
-\label{fig:oversight}
-\end{figure}
-
-\subsection{Catch Rate vs.\ Balanced Accuracy}
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.9\textwidth]{figures/4_metric_validity.png}
-\caption{Raw error-catch rate vs.\ balanced accuracy, by domain. Rankings disagree
-in code, motivating balanced accuracy as the primary metric throughout.}
-\label{fig:metric-validity}
-\end{figure}
-
-
-
-\section{Execution Harness and Differential Fuzzer}
-\label{app:execution}
-
-\subsection{Code Execution Harness}
-To provide environmental grounding for the code domain (HumanEval+), we execute each generated candidate against the benchmark's provided test suite. Executions are isolated using Python's \texttt{subprocess} module with strict resource limits, including a 5-second timeout to prevent infinite loops and memory constraints to prevent out-of-memory crashes. 
-
-During execution, the harness captures a comprehensive set of runtime signals: the system exit code, standard output (\texttt{stdout}), standard error (\texttt{stderr}), the number of passing assertions before failure, and the final traceback frame if an exception occurs. To ensure the LLM verifier can interpret this environment signal, we append a structured execution block to the prompt. The exact block shown to the verifier is formatted as follows:
-
-\begin{quote}
-\small\ttfamily
---- EXECUTION RESULTS ---\\
-Status: [Passed / Failed / Timeout / Syntax Error]\\
-Exit Code: [0 / 1 / etc.]\\
-Assertions Passed: [X / Total]\\[4pt]
-{[}If Failed, Output/Traceback is included here:{]}\\
-Traceback (most recent call last):\\
-...\\
-AssertionError: expected [X], got [Y]
-\end{quote}
-
-The prompt explicitly states that this block is a runtime signal, and permits the judge to mark a passing code block as incorrect if it identifies a logical flaw not covered by the tests. This design makes judge-initiated overrides observable.
-
-\subsection{Differential Fuzzing for Overrides}
-Because LLM verifiers are permitted to override the execution signal, we require a mechanism to determine whether an override of a \emph{passing} test suite is justified (a genuine edge case missed by the test harness) or a hallucination (an unjustified false rejection). We evaluate these cases using differential fuzzing.
-
-When a verifier rejects a candidate that passed the test suite, the fuzzer generates a large volume of mutated, randomized inputs matching the function signature. It executes both the candidate solution and the gold reference solution on these inputs, looking for behavioral differences. The fuzzer categorizes the overrides into three distinct verdicts:
-
-\begin{itemize}
-    \item \textbf{\texttt{BUG\_CONFIRMED}:} The fuzzer discovered an input where the candidate's output diverged from the reference output. The test suite was incomplete, and the LLM verifier was \emph{correct} to override it.
-    \item \textbf{\texttt{REFERENCE\_BUG}:} A discrepancy was found, but manual inspection revealed that the candidate's behavior was actually mathematically or logically correct, and the benchmark's gold reference was flawed.
-    \item \textbf{\texttt{NO\_DISCREPANCY}:} The fuzzer exhausted its mutation budget (thousands of inputs) without finding any divergence between the candidate and the reference. The LLM verifier's override was a hallucination and is deemed \emph{incorrect}.
-\end{itemize}
-
-\paragraph{Fuzzing Results and Reference Bugs.} 
-Across our code domain experiments, verifiers generated 1,856 overrides (rejecting code that passed the test suite). Differential fuzzing revealed that the vast majority of these judge interventions were unjustified. Specifically, \textbf{77.0\%} of overrides resulted in \texttt{NO\_DISCREPANCY}, meaning the judge hallucinated a flaw in logically sound code. Only \textbf{9.0\%} were \texttt{BUG\_CONFIRMED}, where the judge correctly identified a flaw missed by the tests. 
-
-An additional \textbf{0.8\%} of overrides were flagged as \texttt{REFERENCE\_BUG}s (with the remaining 9.1\% skipped due to fuzzer timeouts or parsing errors). Notably, the fuzzer identified subtle flaws in the benchmark's own reference solutions for specific items (e.g., \texttt{code\_HumanEval\_126}), demonstrating that while environmental grounding is highly reliable, even gold-standard test suites contain blind spots that rigorous differential testing can expose.
 
 \newpage
 \input{checklist.tex}
