@@ -629,12 +629,19 @@ The prompt explicitly states that this block is a runtime signal, and permits th
 \subsection{Differential Fuzzing for Overrides}
 Because LLM verifiers are permitted to override the execution signal, we require a mechanism to determine whether an override of a \emph{passing} test suite is justified (a genuine edge case missed by the test harness) or a hallucination (an unjustified false rejection). We evaluate these cases using differential fuzzing.
 
-When a verifier rejects a candidate that passed the test suite, the fuzzer generates a large volume of mutated, randomized inputs matching the function signature. It executes both the candidate solution and the gold reference solution on these inputs, looking for behavioral differences. The fuzzer categorizes the overrides into three distinct verdicts:
+When a verifier rejects a candidate that passed the test suite, the fuzzer generates a large volume of mutated, randomized inputs matching the function signature. It executes both the candidate solution and the gold reference solution on these inputs, looking for behavioral differences. When a divergence is found, an 
+independent LLM oracle (WizardLM-2-8x22B) adjudicates which output is 
+correct — distinguishing a genuine candidate bug from a flaw in the 
+benchmark's own reference solution. We treat oracle verdicts as a soft 
+signal given the oracle is itself unevaluated. The fuzzer categorizes 
+overrides into three distinct verdicts:
 
 \begin{itemize}
     \item \textbf{\texttt{BUG\_CONFIRMED}:} The fuzzer discovered an input where the candidate's output diverged from the reference output. The test suite was incomplete, and the LLM verifier was \emph{correct} to override it.
-    \item \textbf{\texttt{REFERENCE\_BUG}:} A discrepancy was found, but manual inspection revealed that the candidate's behavior was actually mathematically or logically correct, and the benchmark's gold reference was flawed.
-    \item \textbf{\texttt{NO\_DISCREPANCY}:} The fuzzer exhausted its mutation budget (thousands of inputs) without finding any divergence between the candidate and the reference. The LLM verifier's override was a hallucination and is deemed \emph{incorrect}.
+    \item \textbf{\texttt{REFERENCE\_BUG}:} A discrepancy was found, but the 
+    oracle judged the candidate's output to be correct and the benchmark's gold 
+    reference to be flawed.
+    \item \textbf{\texttt{NO\_DISCREPANCY}:} The fuzzer exhausted its mutation budget without finding any divergence between the candidate and the reference. The LLM verifier's override was a hallucination and is deemed \emph{incorrect}.
 \end{itemize}
 
 \paragraph{Fuzzing Results and Reference Bugs.} 
