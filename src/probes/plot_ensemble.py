@@ -27,7 +27,7 @@ DOMAINS = ["science", "math", "code"]
 STRATS = ["direct", "cot", "rubric"]
 COL = {"science": "#C44E52", "math": "#4C72B0", "code": "#55A868"}
 MARK = {"direct": "o", "cot": "s", "rubric": "^"}
-OUT = os.path.join("plots", "actual", "ensemble")
+OUT = os.path.join("reports", "probes", "Do-stronger-models-make-mistakes-that-are-harder-to-catch", "ensemble")
 os.makedirs(OUT, exist_ok=True)
 MODE = "actual"
 
