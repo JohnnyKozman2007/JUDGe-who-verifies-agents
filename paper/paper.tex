@@ -118,8 +118,8 @@
   verification strategy narrows the gap; where the task admits no executable check,
   judges fail together rather than independently, so adding judges buys nothing. Only
   an environment signal changes the picture, and even then judges override that signal
-  on roughly one in eight calls, with independent differential testing confirming fewer
-  than one in ten of those overrides as justified. The binding constraint on agent
+  on roughly one call in ten, with independent differential testing confirming under
+  8\% of those overrides as justified. The binding constraint on agent
   verification is the signal the environment can supply, not the model reading it.
 \end{abstract}
 
@@ -181,7 +181,7 @@ judge is shown an execution result, against 57.2\%--64.5\% where it must judge u
 (Appendix~\ref{app:capability}), and
 the correlation between judges' errors disappears in the grounded case. Even then the
 judge is not the source of that reliability---it contradicts the runtime result on
-roughly one in eight calls, and independent differential testing supports fewer than one in ten of
+roughly one call in ten, and independent differential testing supports under 8\% of
 those contradictions.
 
 \paragraph{Contributions.}
@@ -316,8 +316,8 @@ We report the following metrics, computed at the item level throughout:
 The full accuracy map across every domain, verifier, told frame, actual authorship,
 and strategy (Appendix~\ref{app:fullmap}) is what the two probes below were designed
 to explain. The single best configuration per domain already hints at the story:
-Mistral judging its own code under a bare verdict reaches 97.8\% (Table~\ref{tab:best-combo}),
-far above its 59.7--66\% range for the exact same task under a rubric strategy, while the
+Mistral judging its own code under a bare verdict reaches 97.7\% (Table~\ref{tab:best-combo}),
+far above its 60--75\% range for the exact same task under a rubric strategy, while the
 best math and science configurations top out over 25 points lower than that, regardless
 of which model or strategy is used. That domain gap, and the gap between Mistral's best
 and worst configurations on the same task, are what the following two sections trace to
@@ -371,7 +371,7 @@ Three probes test what drives the reality effect. \textbf{(i) Structural prefere
 Presented with two incorrect candidates, one its own, DeepSeek picked its own 6.6\% of the
 time against 3.5\% for the other model's, and Qwen 12.7\% against 7.2\%
 (Table~\ref{tab:self-preference})---a consistent but small $\approx$1.8$\times$ preference,
-too weak to account for a 12-point gap. \textbf{(ii) Style.} Rewriting every candidate into
+too weak to account for an 11.9-point gap. \textbf{(ii) Style.} Rewriting every candidate into
 another model's prose, against a placebo rewrite of equal length and disruption, moved
 false approval by $-0.2$ pp for DeepSeek (McNemar $p=0.93$) and $-1.5$ pp for Qwen
 ($p=0.13$) (Table~\ref{tab:style-transfer}). Prose style is not the signal.
@@ -449,7 +449,7 @@ ablation.
 
 Without an execution signal, a stronger generator's errors become harder to catch:
 item-adjusted approval of a generator's own errors rises with generator accuracy in
-both science ($-17.2$ to $+14.5$ points, $p<0.001$) and math ($-26.6$ to $+14.8$
+both science ($-17.7$ to $+14.0$ points, $p<0.001$) and math ($-27.0$ to $+14.7$
 points, $p<0.001$, non-monotonic---see Table~\ref{tab:detect-range} for the full
 domain breakdown); in code the same relationship is flat and
 non-significant ($p=0.064$) (Figure~\ref{fig:detectability}). Judges also fail
@@ -638,9 +638,9 @@ When a verifier rejects a candidate that passed the test suite, the fuzzer gener
 \end{itemize}
 
 \paragraph{Fuzzing Results and Reference Bugs.} 
-Across our code domain experiments, verifiers generated 1,856 overrides (rejecting code that passed the test suite). Differential fuzzing revealed that the vast majority of these judge interventions were unjustified. Specifically, \textbf{77.0\%} of overrides resulted in \texttt{NO\_DISCREPANCY}, meaning the judge hallucinated a flaw in logically sound code. Only \textbf{9.0\%} were \texttt{BUG\_CONFIRMED}, where the judge correctly identified a flaw missed by the tests. 
+Across our code domain experiments, verifiers generated 1{,}458 overrides (rejecting code that passed the test suite). Differential fuzzing revealed that the vast majority of these judge interventions were unjustified. Specifically, \textbf{77.2\%} of overrides resulted in \texttt{NO\_DISCREPANCY}, meaning the judge hallucinated a flaw in logically sound code. Only \textbf{7.3\%} were \texttt{BUG\_CONFIRMED}, where the judge correctly identified a flaw missed by the tests.
 
-An additional \textbf{0.8\%} of overrides were flagged as \texttt{REFERENCE\_BUG}s (with the remaining 9.1\% skipped due to fuzzer timeouts or parsing errors). Notably, the fuzzer identified subtle flaws in the benchmark's own reference solutions for specific items (e.g., \texttt{code\_HumanEval\_126}), demonstrating that while environmental grounding is highly reliable, even gold-standard test suites contain blind spots that rigorous differential testing can expose.
+An additional \textbf{0.8\%} of overrides were flagged as \texttt{REFERENCE\_BUG}s; the remaining \textbf{14.7\%} were unresolved (11.5\% pipeline failures and 3.2\% fuzzer errors). Notably, the fuzzer identified subtle flaws in the benchmark's own reference solutions for five items (\texttt{code\_HumanEval\_17}, \texttt{\_59}, \texttt{\_78}, \texttt{\_126} and \texttt{\_134}), demonstrating that while environmental grounding is highly reliable, even gold-standard test suites contain blind spots that rigorous differential testing can expose.
 
 \section{Verification Prompts}
 \label{app:prompts}
