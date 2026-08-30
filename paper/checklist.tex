@@ -7,7 +7,7 @@
 \item {\bf Claims}
     \item[] Question: Do the main claims made in the abstract and introduction accurately reflect the paper's contributions and scope?
     \item[] Answer: \answerYes{}
-    \item[] Justification: The abstract's four core claims (blinding fails, stronger generator errors are harder to catch, judge errors correlate, and grounding is the reliability driver) are directly supported by results in Sections~\ref{sec:results-belief} and~\ref{sec:results-detect} and Appendices~\ref{app:fullmap} and~\ref{app:execution}, with limitations explicitly bounded in Section~\ref{sec:limitations}.
+    \item[] Justification: The abstract's four core claims (blinding fails, stronger generators' errors are harder to catch, judge errors correlate, and grounding is the reliability driver) are directly supported by results in Sections~\ref{sec:results-belief} and~\ref{sec:results-detect}, and Appendices~\ref{app:fullmap}, \ref{app:capability} and~\ref{app:execution}, with limitations explicitly bounded in Section~\ref{sec:limitations}.
     \item[] Guidelines:
     \begin{itemize}
         \item The answer \answerNA{} means that the abstract and introduction do not include the claims made in the paper.
@@ -19,7 +19,7 @@
 \item {\bf Limitations}
     \item[] Question: Does the paper discuss the limitations of the work performed by the authors?
     \item[] Answer: \answerYes{}
-    \item[] Justification: Limitations, including the single-turn prompting scope and the absence of environmental grounding in non-code domains, are discussed in Section~\ref{sec:limitations}.
+    \item[] Justification: Section~\ref{sec:limitations} discusses the single-turn prompting scope; the absence of environmental grounding outside the code domain, which makes the grounding comparison cross-domain rather than an ablation; the partial circularity of code ground truth, which is the execution result the judge is also shown; the use of an unevaluated LLM as the fuzzing oracle; and the capacity gap between the 12B judge and the three 70B-class judges, which confounds model-level rankings.
     \item[] Guidelines:
     \begin{itemize}
         \item The answer \answerNA{} means that the paper has no limitation while the answer \answerNo{} means that the paper has limitations, but those are not discussed in the paper. 
@@ -49,7 +49,7 @@
     \item {\bf Experimental result reproducibility}
     \item[] Question: Does the paper fully disclose all the information needed to reproduce the main experimental results of the paper to the extent that it affects the main claims and/or conclusions of the paper (regardless of whether the code and data are provided or not)?
     \item[] Answer: \answerYes{}
-    \item[] Justification: All models, benchmarks, prompts, inference settings (temperature 0), and the full 4×4×3×3 experimental design are specified in Sections~2 and~3, with the complete code, prompts, and verification traces released in the anonymized repository.
+    \item[] Justification: All models, benchmarks, prompts, inference settings (temperature 0), and the full $4{\times}4{\times}3{\times}3$ experimental design are specified in Sections~\ref{sec:setup} and~\ref{sec:results}, with the complete code, prompts, and verification traces released in an anonymized supplementary archive.
     \item[] Guidelines:
     \begin{itemize}
         \item The answer \answerNA{} means that the paper does not include experiments.
@@ -69,7 +69,7 @@
 \item {\bf Open access to data and code}
     \item[] Question: Does the paper provide open access to the data and code, with sufficient instructions to faithfully reproduce the main experimental results, as described in supplemental material?
     \item[] Answer: \answerYes{}
-    \item[] Justification: Sections 2 and 3 specify all benchmarks (HumanEval+, MATH, GPQA-Diamond), models (Qwen2.5-72B, DeepSeek-V3, Llama-3.3-70B, Mistral-Nemo-12B), inference temperature (0), all prompt variants, and the full 4×4×3×3 verification grid.
+    \item[] Justification: Code, all prompt templates, the grading and execution harnesses, and the complete set of 64{,}800 verification traces are provided in an anonymized supplementary archive, together with the commands needed to regenerate every reported table and figure.
     \item[] Guidelines:
     \begin{itemize}
         \item The answer \answerNA{} means that paper does not include experiments requiring code.
@@ -86,7 +86,7 @@
 \item {\bf Experimental setting/details}
     \item[] Question: Does the paper specify all the training and test details (e.g., data splits, hyperparameters, how they were chosen, type of optimizer) necessary to understand the results?
     \item[] Answer: \answerYes{}
-    \item[] Justification: Section 3.2 reports p-values for detectability trends (p<0.001), and the paper explicitly states that all confidence intervals are computed by resampling items rather than verification calls, with balanced accuracy used as the primary metric.
+    \item[] Justification: Sections~\ref{sec:setup} and~\ref{sec:results} specify all benchmarks (HumanEval+, MATH, GPQA-Diamond), models (Qwen2.5-72B, DeepSeek-V3, Llama-3.3-70B, Mistral-Nemo-12B), inference temperature (0), all prompt variants, and the full $4{\times}4{\times}3{\times}3$ verification grid.
     \item[] Guidelines:
     \begin{itemize}
         \item The answer \answerNA{} means that the paper does not include experiments.
@@ -96,8 +96,8 @@
 
 \item {\bf Experiment statistical significance}
     \item[] Question: Does the paper report error bars suitably and correctly defined or other appropriate information about the statistical significance of the experiments?
-    \item[] Answer: \answerNo{}
-    \item[] Justification: The paper specifies DeepInfra as the inference provider (so no personal compute is required) but does not report memory, storage, or total execution time needed to reproduce the experiments.
+    \item[] Answer: \answerYes{}
+    \item[] Justification: Section~\ref{sec:results-detect} reports p-values for detectability trends ($p<0.001$), and the paper explicitly states that all confidence intervals are computed by resampling items rather than verification calls, with balanced accuracy used as the primary metric. Effect sizes are accompanied by item-clustered bootstrap intervals, permutation tests, and Bonferroni correction across the full family of probe cells.
     \item[] Guidelines:
     \begin{itemize}
         \item The answer \answerNA{} means that the paper does not include experiments.
@@ -114,7 +114,7 @@
 \item {\bf Experiments compute resources}
     \item[] Question: For each experiment, does the paper provide sufficient information on the computer resources (type of compute workers, memory, time of execution) needed to reproduce the experiments?
     \item[] Answer: \answerYes{}
-    \item[] Justification: The research uses only public benchmarks (HumanEval+, MATH, GPQA), involves no human subjects, and releases only anonymized code and traces with no privacy or dual-use concerns.
+    \item[] Justification: All experiments are inference-only through a single hosted API provider, so no local GPU is required; the full grid consumes approximately 52M prompt tokens and 3M completion tokens across 64{,}800 verification calls, alongside a CPU-only subprocess harness for code execution with a 5-second per-candidate timeout.
     \item[] Guidelines:
     \begin{itemize}
         \item The answer \answerNA{} means that the paper does not include experiments.
@@ -125,8 +125,8 @@
     
 \item {\bf Code of ethics}
     \item[] Question: Does the research conducted in the paper conform, in every respect, with the NeurIPS Code of Ethics \url{https://neurips.cc/public/EthicsGuidelines}?
-    \item[] Answer: \answerNo{}
-    \item[] Justification: The paper is foundational research on verification protocols and does not propose a specific deployment or application, so it does not explicitly discuss broader societal impacts.
+    \item[] Answer: \answerYes{}
+    \item[] Justification: The research uses only public benchmarks (HumanEval+, MATH, GPQA), involves no human subjects, and releases only anonymized code and traces with no privacy or dual-use concerns. The authors have reviewed the NeurIPS Code of Ethics and the work conforms to it in every respect.
     \item[] Guidelines:
     \begin{itemize}
         \item The answer \answerNA{} means that the authors have not reviewed the NeurIPS Code of Ethics.
@@ -137,8 +137,8 @@
 
 \item {\bf Broader impacts}
     \item[] Question: Does the paper discuss both potential positive societal impacts and negative societal impacts of the work performed?
-    \item[] Answer: \answerNA{}
-    \item[] Justification: The paper releases only code, prompts, and verification traces; no high-risk models or scraped datasets are released.
+    \item[] Answer: \answerYes{}
+    \item[] Justification: The paper is foundational research on verification protocols and does not propose a specific deployment. Its positive impact is to discourage over-reliance on ungrounded LLM verification in agent pipelines, where we show a judge can be barely better than a constant rule; the corresponding risk is that the grounding result is read as licence to trust execution-based checks uncritically, which Section~\ref{sec:results-detect} explicitly cautions against.
     \item[] Guidelines:
     \begin{itemize}
         \item The answer \answerNA{} means that there is no societal impact of the work performed.
@@ -164,7 +164,7 @@
 \item {\bf Licenses for existing assets}
     \item[] Question: Are the creators or original owners of assets (e.g., code, data, models), used in the paper, properly credited and are the license and terms of use explicitly mentioned and properly respected?
     \item[] Answer: \answerYes{}
-    \item[] Justification: The paper cites the original works (HumanEval+, MATH, GPQA) and explicitly lists their licenses (MIT, CC BY-NC-SA 4.0, MIT) in a footnote in Section~2, respecting all terms of academic use.
+    \item[] Justification: The paper cites the original works and states their licenses in Section~\ref{sec:setup}: HumanEval+/EvalPlus (Apache-2.0, built on OpenAI's HumanEval under MIT), MATH (MIT), and GPQA-Diamond (CC BY-4.0, accessed under its gated-release terms). All assets are used within their terms for academic research.
     \item[] Guidelines:
     \begin{itemize}
         \item The answer \answerNA{} means that the paper does not use existing assets.
@@ -180,7 +180,7 @@
 \item {\bf New assets}
     \item[] Question: Are new assets introduced in the paper well documented and is the documentation provided alongside the assets?
     \item[] Answer: \answerYes{}
-    \item[] Justification: We release anonymized code, prompts, and the full 64,800 verification traces, documented in the supplemental material and the project repository.
+    \item[] Justification: We release anonymized code, prompts, and the full 64{,}800 verification traces, documented in the supplemental material and the project repository.
     \item[] Guidelines:
     \begin{itemize}
         \item The answer \answerNA{} means that the paper does not release new assets.
@@ -214,8 +214,8 @@
 
 \item {\bf Declaration of LLM usage}
     \item[] Question: Does the paper describe the usage of LLMs if it is an important, original, or non-standard component of the core methods in this research? Note that if the LLM is used only for writing, editing, or formatting purposes and does \emph{not} impact the core methodology, scientific rigor, or originality of the research, declaration is not required.
-    \item[] Answer: \answerNA{}
-    \item[] Justification: LLMs were used only for writing assistance, editing, and formatting; they were not used as an important, original, or non-standard component of the core research methodology.
+    \item[] Answer: \answerYes{}
+    \item[] Justification: Beyond the four models under evaluation, three additional LLMs serve as methodological components: \texttt{google/gemma-2-27b-it} generates adversarial inputs for the differential fuzzer, \texttt{microsoft/WizardLM-2-8x22B} acts as the oracle adjudicating candidate-versus-reference disagreements, and \texttt{mistralai/Mixtral-8x7B-Instruct} performs the style-transfer rewrites in the self-recognition probe. Section~\ref{sec:limitations} notes that the oracle is itself an unevaluated LLM and treats its verdicts as a soft signal rather than gold-standard ground truth. LLMs were otherwise used only for writing and editing.
     \item[] Guidelines:
     \begin{itemize}
         \item The answer \answerNA{} means that the core method development in this research does not involve LLMs as any important, original, or non-standard components.
