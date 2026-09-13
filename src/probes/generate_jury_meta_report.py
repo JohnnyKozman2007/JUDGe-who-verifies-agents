@@ -25,10 +25,11 @@ from collections import defaultdict
 
 def find_repo_root() -> Path:
     cur = Path(__file__).resolve().parent
-    for p in [cur, cur.parent, cur.parent.parent]:
-        if (p / "reports").exists() or (p / "data").exists():
-            return p
-    return cur.parent
+    for _ in range(5):
+        if (cur / "data" / "raw" / "code.jsonl").exists() or (cur / "reports" / "probes").exists():
+            return cur
+        cur = cur.parent
+    return Path.cwd()
 
 BENCHMARKS = {
     "qwen / neutral+direct": 98.0,
@@ -250,6 +251,7 @@ def main():
 
     repo_root = find_repo_root()
     probe_dir = repo_root / "reports" / "probes" / "jury_code_probe"
+    probe_dir.mkdir(parents=True, exist_ok=True)
 
     if args.trace:
         trace_path = Path(args.trace)

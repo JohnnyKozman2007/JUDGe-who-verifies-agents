@@ -50,6 +50,9 @@ import time
 from collections import Counter
 from pathlib import Path
 
+# Ensure src/probes is on sys.path so sibling modules (generate_jury_meta_report) can always be imported
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
 from openai import AsyncOpenAI
 
 # --------------------------------------------------------------------------

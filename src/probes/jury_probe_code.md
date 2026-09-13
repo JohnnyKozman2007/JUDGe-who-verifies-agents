@@ -99,17 +99,17 @@ export DEEPINFRA_API_KEY="your-deepinfra-key-here"
 Always run the pilot first to verify connectivity and parsing:
 ```bash
 # Run 10 items for both teams
-python "new probe/files (1)/jury_probe_code.py" --team both --pilot 10
+python src/probes/jury_probe_code.py --team both --pilot 10
 
 # Or test a single team:
-python "new probe/files (1)/jury_probe_code.py" --team team_1 --pilot 10
-python "new probe/files (1)/jury_probe_code.py" --team team_2 --pilot 10
+python src/probes/jury_probe_code.py --team team_1 --pilot 10
+python src/probes/jury_probe_code.py --team team_2 --pilot 10
 ```
 
 ### 2. Full Benchmark Run (All 150 items)
 Once the pilot completes cleanly, launch the full experiment:
 ```bash
-python "new probe/files (1)/jury_probe_code.py" --team both
+python src/probes/jury_probe_code.py --team both
 ```
 
 ---

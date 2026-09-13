@@ -26,6 +26,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from analysis_detectability import load_or_build_grades
 
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+
 DOMAINS = ["science", "math", "code"]
 MODELS = ["qwen", "deepseek", "llama", "mistral"]
 VCOLS = [f"v_{m}" for m in MODELS]
@@ -409,7 +411,7 @@ if __name__ == "__main__":
     domain_reports = {}
     for dom in a.domains:
         suffix = ".jsonl" if a.mode == "actual" else "_pilot.jsonl"
-        if not os.path.exists(os.path.join("data", "verified", f"{dom}{suffix}")):
+        if not os.path.exists(os.path.join(REPO_ROOT, "data", "verified", f"{dom}{suffix}")):
             print(f"\n[{dom}] no verified data, skipping"); continue
         df = build_vote_frame(dom, a.mode, a.frame)
         domain_reports[dom] = {}
@@ -440,7 +442,7 @@ if __name__ == "__main__":
             diversity_gain(df, dom, strat)
 
     # Save unified per-domain JSON and Markdown
-    out_dir = os.path.join("reports", "probes", "Do-stronger-models-make-mistakes-that-are-harder-to-catch", "ensemble")
+    out_dir = os.path.join(REPO_ROOT, "reports", "probes", "Do-stronger-models-make-mistakes-that-are-harder-to-catch", "ensemble")
     os.makedirs(out_dir, exist_ok=True)
     json_path = os.path.join(out_dir, "ensemble_metrics_by_domain.json")
     md_path = os.path.join(out_dir, "ensemble_metrics_by_domain.md")
