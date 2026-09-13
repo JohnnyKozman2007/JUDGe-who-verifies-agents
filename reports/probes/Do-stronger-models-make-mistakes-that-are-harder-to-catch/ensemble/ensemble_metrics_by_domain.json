@@ -1,0 +1,1079 @@
+{
+  "science": {
+    "direct": {
+      "rules": [
+        {
+          "n": 600,
+          "acc": 0.5033,
+          "catch": 0.1791,
+          "confirm": 0.9132,
+          "bal_acc": 0.5462,
+          "fpr": 0.8209,
+          "fnr": 0.0868,
+          "precision": 0.4681,
+          "f1": 0.6189,
+          "rule": "1-of-3",
+          "k": 1
+        },
+        {
+          "n": 600,
+          "acc": 0.5733,
+          "catch": 0.397,
+          "confirm": 0.7962,
+          "bal_acc": 0.5966,
+          "fpr": 0.603,
+          "fnr": 0.2038,
+          "precision": 0.5109,
+          "f1": 0.6224,
+          "rule": "2-of-3",
+          "k": 2
+        },
+        {
+          "n": 600,
+          "acc": 0.6317,
+          "catch": 0.6269,
+          "confirm": 0.6377,
+          "bal_acc": 0.6323,
+          "fpr": 0.3731,
+          "fnr": 0.3623,
+          "precision": 0.5748,
+          "f1": 0.6047,
+          "rule": "3-of-3",
+          "k": 3
+        }
+      ],
+      "singles": [
+        {
+          "n": 450,
+          "acc": 0.5778,
+          "catch": 0.4535,
+          "confirm": 0.7448,
+          "bal_acc": 0.5991,
+          "fpr": 0.5465,
+          "fnr": 0.2552,
+          "precision": 0.5035,
+          "f1": 0.6008,
+          "model": "qwen"
+        },
+        {
+          "n": 450,
+          "acc": 0.6356,
+          "catch": 0.6489,
+          "confirm": 0.617,
+          "bal_acc": 0.6329,
+          "fpr": 0.3511,
+          "fnr": 0.383,
+          "precision": 0.5577,
+          "f1": 0.5859,
+          "model": "deepseek"
+        },
+        {
+          "n": 450,
+          "acc": 0.5667,
+          "catch": 0.3896,
+          "confirm": 0.7861,
+          "bal_acc": 0.5878,
+          "fpr": 0.6104,
+          "fnr": 0.2139,
+          "precision": 0.5097,
+          "f1": 0.6184,
+          "model": "llama"
+        },
+        {
+          "n": 450,
+          "acc": 0.4978,
+          "catch": 0.0805,
+          "confirm": 0.9579,
+          "bal_acc": 0.5192,
+          "fpr": 0.9195,
+          "fnr": 0.0421,
+          "precision": 0.4858,
+          "f1": 0.6447,
+          "model": "mistral"
+        }
+      ],
+      "best_ensemble": {
+        "n": 600,
+        "acc": 0.6317,
+        "catch": 0.6269,
+        "confirm": 0.6377,
+        "bal_acc": 0.6323,
+        "fpr": 0.3731,
+        "fnr": 0.3623,
+        "precision": 0.5748,
+        "f1": 0.6047,
+        "rule": "3-of-3",
+        "k": 3
+      },
+      "best_single": {
+        "n": 450,
+        "acc": 0.6356,
+        "catch": 0.6489,
+        "confirm": 0.617,
+        "bal_acc": 0.6329,
+        "fpr": 0.3511,
+        "fnr": 0.383,
+        "precision": 0.5577,
+        "f1": 0.5859,
+        "model": "deepseek"
+      },
+      "advantage_pp": -0.06
+    },
+    "cot": {
+      "rules": [
+        {
+          "n": 599,
+          "acc": 0.5326,
+          "catch": 0.2328,
+          "confirm": 0.9129,
+          "bal_acc": 0.5729,
+          "fpr": 0.7672,
+          "fnr": 0.0871,
+          "precision": 0.4839,
+          "f1": 0.6325,
+          "rule": "1-of-3",
+          "k": 1
+        },
+        {
+          "n": 599,
+          "acc": 0.581,
+          "catch": 0.4299,
+          "confirm": 0.7727,
+          "bal_acc": 0.6013,
+          "fpr": 0.5701,
+          "fnr": 0.2273,
+          "precision": 0.5165,
+          "f1": 0.6191,
+          "rule": "2-of-3",
+          "k": 2
+        },
+        {
+          "n": 599,
+          "acc": 0.6277,
+          "catch": 0.6776,
+          "confirm": 0.5644,
+          "bal_acc": 0.621,
+          "fpr": 0.3224,
+          "fnr": 0.4356,
+          "precision": 0.5798,
+          "f1": 0.572,
+          "rule": "3-of-3",
+          "k": 3
+        }
+      ],
+      "singles": [
+        {
+          "n": 449,
+          "acc": 0.5835,
+          "catch": 0.438,
+          "confirm": 0.7801,
+          "bal_acc": 0.609,
+          "fpr": 0.562,
+          "fnr": 0.2199,
+          "precision": 0.5068,
+          "f1": 0.6144,
+          "model": "qwen"
+        },
+        {
+          "n": 449,
+          "acc": 0.637,
+          "catch": 0.6832,
+          "confirm": 0.5722,
+          "bal_acc": 0.6277,
+          "fpr": 0.3168,
+          "fnr": 0.4278,
+          "precision": 0.5632,
+          "f1": 0.5676,
+          "model": "deepseek"
+        },
+        {
+          "n": 449,
+          "acc": 0.5813,
+          "catch": 0.4458,
+          "confirm": 0.75,
+          "bal_acc": 0.5979,
+          "fpr": 0.5542,
+          "fnr": 0.25,
+          "precision": 0.5208,
+          "f1": 0.6148,
+          "model": "llama"
+        },
+        {
+          "n": 450,
+          "acc": 0.52,
+          "catch": 0.1949,
+          "confirm": 0.8785,
+          "bal_acc": 0.5367,
+          "fpr": 0.8051,
+          "fnr": 0.1215,
+          "precision": 0.4974,
+          "f1": 0.6351,
+          "model": "mistral"
+        }
+      ],
+      "best_ensemble": {
+        "n": 599,
+        "acc": 0.6277,
+        "catch": 0.6776,
+        "confirm": 0.5644,
+        "bal_acc": 0.621,
+        "fpr": 0.3224,
+        "fnr": 0.4356,
+        "precision": 0.5798,
+        "f1": 0.572,
+        "rule": "3-of-3",
+        "k": 3
+      },
+      "best_single": {
+        "n": 449,
+        "acc": 0.637,
+        "catch": 0.6832,
+        "confirm": 0.5722,
+        "bal_acc": 0.6277,
+        "fpr": 0.3168,
+        "fnr": 0.4278,
+        "precision": 0.5632,
+        "f1": 0.5676,
+        "model": "deepseek"
+      },
+      "advantage_pp": -0.67
+    },
+    "rubric": {
+      "rules": [
+        {
+          "n": 600,
+          "acc": 0.545,
+          "catch": 0.2776,
+          "confirm": 0.883,
+          "bal_acc": 0.5803,
+          "fpr": 0.7224,
+          "fnr": 0.117,
+          "precision": 0.4916,
+          "f1": 0.6316,
+          "rule": "1-of-3",
+          "k": 1
+        },
+        {
+          "n": 600,
+          "acc": 0.5833,
+          "catch": 0.4657,
+          "confirm": 0.7321,
+          "bal_acc": 0.5989,
+          "fpr": 0.5343,
+          "fnr": 0.2679,
+          "precision": 0.5201,
+          "f1": 0.6082,
+          "rule": "2-of-3",
+          "k": 2
+        },
+        {
+          "n": 600,
+          "acc": 0.625,
+          "catch": 0.6806,
+          "confirm": 0.5547,
+          "bal_acc": 0.6177,
+          "fpr": 0.3194,
+          "fnr": 0.4453,
+          "precision": 0.5787,
+          "f1": 0.5665,
+          "rule": "3-of-3",
+          "k": 3
+        }
+      ],
+      "singles": [
+        {
+          "n": 450,
+          "acc": 0.6178,
+          "catch": 0.4884,
+          "confirm": 0.7917,
+          "bal_acc": 0.64,
+          "fpr": 0.5116,
+          "fnr": 0.2083,
+          "precision": 0.5352,
+          "f1": 0.6387,
+          "model": "qwen"
+        },
+        {
+          "n": 450,
+          "acc": 0.6311,
+          "catch": 0.6985,
+          "confirm": 0.5372,
+          "bal_acc": 0.6179,
+          "fpr": 0.3015,
+          "fnr": 0.4628,
+          "precision": 0.5611,
+          "f1": 0.5489,
+          "model": "deepseek"
+        },
+        {
+          "n": 450,
+          "acc": 0.5644,
+          "catch": 0.4378,
+          "confirm": 0.7214,
+          "bal_acc": 0.5796,
+          "fpr": 0.5622,
+          "fnr": 0.2786,
+          "precision": 0.5088,
+          "f1": 0.5967,
+          "model": "llama"
+        },
+        {
+          "n": 450,
+          "acc": 0.5244,
+          "catch": 0.25,
+          "confirm": 0.8271,
+          "bal_acc": 0.5386,
+          "fpr": 0.75,
+          "fnr": 0.1729,
+          "precision": 0.5,
+          "f1": 0.6232,
+          "model": "mistral"
+        }
+      ],
+      "best_ensemble": {
+        "n": 600,
+        "acc": 0.625,
+        "catch": 0.6806,
+        "confirm": 0.5547,
+        "bal_acc": 0.6177,
+        "fpr": 0.3194,
+        "fnr": 0.4453,
+        "precision": 0.5787,
+        "f1": 0.5665,
+        "rule": "3-of-3",
+        "k": 3
+      },
+      "best_single": {
+        "n": 450,
+        "acc": 0.6178,
+        "catch": 0.4884,
+        "confirm": 0.7917,
+        "bal_acc": 0.64,
+        "fpr": 0.5116,
+        "fnr": 0.2083,
+        "precision": 0.5352,
+        "f1": 0.6387,
+        "model": "qwen"
+      },
+      "advantage_pp": -2.24
+    }
+  },
+  "math": {
+    "direct": {
+      "rules": [
+        {
+          "n": 600,
+          "acc": 0.6183,
+          "catch": 0.1439,
+          "confirm": 0.9911,
+          "bal_acc": 0.5675,
+          "fpr": 0.8561,
+          "fnr": 0.0089,
+          "precision": 0.5957,
+          "f1": 0.7441,
+          "rule": "1-of-3",
+          "k": 1
+        },
+        {
+          "n": 600,
+          "acc": 0.6617,
+          "catch": 0.2765,
+          "confirm": 0.9643,
+          "bal_acc": 0.6204,
+          "fpr": 0.7235,
+          "fnr": 0.0357,
+          "precision": 0.6291,
+          "f1": 0.7615,
+          "rule": "2-of-3",
+          "k": 2
+        },
+        {
+          "n": 600,
+          "acc": 0.6783,
+          "catch": 0.3939,
+          "confirm": 0.9018,
+          "bal_acc": 0.6479,
+          "fpr": 0.6061,
+          "fnr": 0.0982,
+          "precision": 0.6544,
+          "f1": 0.7584,
+          "rule": "3-of-3",
+          "k": 3
+        }
+      ],
+      "singles": [
+        {
+          "n": 450,
+          "acc": 0.6756,
+          "catch": 0.3582,
+          "confirm": 0.9317,
+          "bal_acc": 0.645,
+          "fpr": 0.6418,
+          "fnr": 0.0683,
+          "precision": 0.6427,
+          "f1": 0.7607,
+          "model": "qwen"
+        },
+        {
+          "n": 450,
+          "acc": 0.6889,
+          "catch": 0.4184,
+          "confirm": 0.8976,
+          "bal_acc": 0.658,
+          "fpr": 0.5816,
+          "fnr": 0.1024,
+          "precision": 0.6667,
+          "f1": 0.7651,
+          "model": "deepseek"
+        },
+        {
+          "n": 450,
+          "acc": 0.62,
+          "catch": 0.25,
+          "confirm": 0.9867,
+          "bal_acc": 0.6184,
+          "fpr": 0.75,
+          "fnr": 0.0133,
+          "precision": 0.5703,
+          "f1": 0.7229,
+          "model": "llama"
+        },
+        {
+          "n": 450,
+          "acc": 0.6267,
+          "catch": 0.0292,
+          "confirm": 0.9928,
+          "bal_acc": 0.511,
+          "fpr": 0.9708,
+          "fnr": 0.0072,
+          "precision": 0.6253,
+          "f1": 0.7673,
+          "model": "mistral"
+        }
+      ],
+      "best_ensemble": {
+        "n": 600,
+        "acc": 0.6783,
+        "catch": 0.3939,
+        "confirm": 0.9018,
+        "bal_acc": 0.6479,
+        "fpr": 0.6061,
+        "fnr": 0.0982,
+        "precision": 0.6544,
+        "f1": 0.7584,
+        "rule": "3-of-3",
+        "k": 3
+      },
+      "best_single": {
+        "n": 450,
+        "acc": 0.6889,
+        "catch": 0.4184,
+        "confirm": 0.8976,
+        "bal_acc": 0.658,
+        "fpr": 0.5816,
+        "fnr": 0.1024,
+        "precision": 0.6667,
+        "f1": 0.7651,
+        "model": "deepseek"
+      },
+      "advantage_pp": -1.01
+    },
+    "cot": {
+      "rules": [
+        {
+          "n": 569,
+          "acc": 0.638,
+          "catch": 0.1888,
+          "confirm": 0.9875,
+          "bal_acc": 0.5881,
+          "fpr": 0.8112,
+          "fnr": 0.0125,
+          "precision": 0.61,
+          "f1": 0.7542,
+          "rule": "1-of-3",
+          "k": 1
+        },
+        {
+          "n": 569,
+          "acc": 0.6661,
+          "catch": 0.2851,
+          "confirm": 0.9625,
+          "bal_acc": 0.6238,
+          "fpr": 0.7149,
+          "fnr": 0.0375,
+          "precision": 0.6337,
+          "f1": 0.7643,
+          "rule": "2-of-3",
+          "k": 2
+        },
+        {
+          "n": 569,
+          "acc": 0.6784,
+          "catch": 0.4137,
+          "confirm": 0.8844,
+          "bal_acc": 0.649,
+          "fpr": 0.5863,
+          "fnr": 0.1156,
+          "precision": 0.6597,
+          "f1": 0.7557,
+          "rule": "3-of-3",
+          "k": 3
+        }
+      ],
+      "singles": [
+        {
+          "n": 433,
+          "acc": 0.6744,
+          "catch": 0.3368,
+          "confirm": 0.9458,
+          "bal_acc": 0.6413,
+          "fpr": 0.6632,
+          "fnr": 0.0542,
+          "precision": 0.6394,
+          "f1": 0.763,
+          "model": "qwen"
+        },
+        {
+          "n": 430,
+          "acc": 0.6953,
+          "catch": 0.4492,
+          "confirm": 0.8848,
+          "bal_acc": 0.667,
+          "fpr": 0.5508,
+          "fnr": 0.1152,
+          "precision": 0.6761,
+          "f1": 0.7665,
+          "model": "deepseek"
+        },
+        {
+          "n": 424,
+          "acc": 0.6321,
+          "catch": 0.2762,
+          "confirm": 0.9813,
+          "bal_acc": 0.6287,
+          "fpr": 0.7238,
+          "fnr": 0.0187,
+          "precision": 0.5801,
+          "f1": 0.7292,
+          "model": "llama"
+        },
+        {
+          "n": 420,
+          "acc": 0.6405,
+          "catch": 0.0892,
+          "confirm": 0.9696,
+          "bal_acc": 0.5294,
+          "fpr": 0.9108,
+          "fnr": 0.0304,
+          "precision": 0.6407,
+          "f1": 0.7716,
+          "model": "mistral"
+        }
+      ],
+      "best_ensemble": {
+        "n": 569,
+        "acc": 0.6784,
+        "catch": 0.4137,
+        "confirm": 0.8844,
+        "bal_acc": 0.649,
+        "fpr": 0.5863,
+        "fnr": 0.1156,
+        "precision": 0.6597,
+        "f1": 0.7557,
+        "rule": "3-of-3",
+        "k": 3
+      },
+      "best_single": {
+        "n": 430,
+        "acc": 0.6953,
+        "catch": 0.4492,
+        "confirm": 0.8848,
+        "bal_acc": 0.667,
+        "fpr": 0.5508,
+        "fnr": 0.1152,
+        "precision": 0.6761,
+        "f1": 0.7665,
+        "model": "deepseek"
+      },
+      "advantage_pp": -1.8
+    },
+    "rubric": {
+      "rules": [
+        {
+          "n": 570,
+          "acc": 0.6175,
+          "catch": 0.1725,
+          "confirm": 0.9778,
+          "bal_acc": 0.5752,
+          "fpr": 0.8275,
+          "fnr": 0.0222,
+          "precision": 0.5934,
+          "f1": 0.7386,
+          "rule": "1-of-3",
+          "k": 1
+        },
+        {
+          "n": 570,
+          "acc": 0.6614,
+          "catch": 0.3098,
+          "confirm": 0.946,
+          "bal_acc": 0.6279,
+          "fpr": 0.6902,
+          "fnr": 0.054,
+          "precision": 0.6287,
+          "f1": 0.7554,
+          "rule": "2-of-3",
+          "k": 2
+        },
+        {
+          "n": 570,
+          "acc": 0.6825,
+          "catch": 0.4353,
+          "confirm": 0.8825,
+          "bal_acc": 0.6589,
+          "fpr": 0.5647,
+          "fnr": 0.1175,
+          "precision": 0.6588,
+          "f1": 0.7544,
+          "rule": "3-of-3",
+          "k": 3
+        }
+      ],
+      "singles": [
+        {
+          "n": 436,
+          "acc": 0.6766,
+          "catch": 0.3604,
+          "confirm": 0.9372,
+          "bal_acc": 0.6488,
+          "fpr": 0.6396,
+          "fnr": 0.0628,
+          "precision": 0.64,
+          "f1": 0.7606,
+          "model": "qwen"
+        },
+        {
+          "n": 428,
+          "acc": 0.7056,
+          "catch": 0.4974,
+          "confirm": 0.8734,
+          "bal_acc": 0.6854,
+          "fpr": 0.5026,
+          "fnr": 0.1266,
+          "precision": 0.6832,
+          "f1": 0.7667,
+          "model": "deepseek"
+        },
+        {
+          "n": 426,
+          "acc": 0.6009,
+          "catch": 0.2372,
+          "confirm": 0.9716,
+          "bal_acc": 0.6044,
+          "fpr": 0.7628,
+          "fnr": 0.0284,
+          "precision": 0.5556,
+          "f1": 0.7069,
+          "model": "llama"
+        },
+        {
+          "n": 420,
+          "acc": 0.631,
+          "catch": 0.1049,
+          "confirm": 0.9612,
+          "bal_acc": 0.5331,
+          "fpr": 0.8951,
+          "fnr": 0.0388,
+          "precision": 0.631,
+          "f1": 0.7619,
+          "model": "mistral"
+        }
+      ],
+      "best_ensemble": {
+        "n": 570,
+        "acc": 0.6825,
+        "catch": 0.4353,
+        "confirm": 0.8825,
+        "bal_acc": 0.6589,
+        "fpr": 0.5647,
+        "fnr": 0.1175,
+        "precision": 0.6588,
+        "f1": 0.7544,
+        "rule": "3-of-3",
+        "k": 3
+      },
+      "best_single": {
+        "n": 428,
+        "acc": 0.7056,
+        "catch": 0.4974,
+        "confirm": 0.8734,
+        "bal_acc": 0.6854,
+        "fpr": 0.5026,
+        "fnr": 0.1266,
+        "precision": 0.6832,
+        "f1": 0.7667,
+        "model": "deepseek"
+      },
+      "advantage_pp": -2.65
+    }
+  },
+  "code": {
+    "direct": {
+      "rules": [
+        {
+          "n": 600,
+          "acc": 0.8833,
+          "catch": 0.6324,
+          "confirm": 0.9952,
+          "bal_acc": 0.8138,
+          "fpr": 0.3676,
+          "fnr": 0.0048,
+          "precision": 0.8586,
+          "f1": 0.9219,
+          "rule": "1-of-3",
+          "k": 1
+        },
+        {
+          "n": 600,
+          "acc": 0.95,
+          "catch": 0.8919,
+          "confirm": 0.9759,
+          "bal_acc": 0.9339,
+          "fpr": 0.1081,
+          "fnr": 0.0241,
+          "precision": 0.9529,
+          "f1": 0.9643,
+          "rule": "2-of-3",
+          "k": 2
+        },
+        {
+          "n": 600,
+          "acc": 0.9367,
+          "catch": 0.9784,
+          "confirm": 0.9181,
+          "bal_acc": 0.9482,
+          "fpr": 0.0216,
+          "fnr": 0.0819,
+          "precision": 0.9896,
+          "f1": 0.9525,
+          "rule": "3-of-3",
+          "k": 3
+        }
+      ],
+      "singles": [
+        {
+          "n": 450,
+          "acc": 0.96,
+          "catch": 0.9184,
+          "confirm": 0.9802,
+          "bal_acc": 0.9493,
+          "fpr": 0.0816,
+          "fnr": 0.0198,
+          "precision": 0.9612,
+          "f1": 0.9706,
+          "model": "qwen"
+        },
+        {
+          "n": 450,
+          "acc": 0.8933,
+          "catch": 0.7935,
+          "confirm": 0.9458,
+          "bal_acc": 0.8697,
+          "fpr": 0.2065,
+          "fnr": 0.0542,
+          "precision": 0.8971,
+          "f1": 0.9208,
+          "model": "deepseek"
+        },
+        {
+          "n": 450,
+          "acc": 0.8711,
+          "catch": 0.6861,
+          "confirm": 0.9521,
+          "bal_acc": 0.8191,
+          "fpr": 0.3139,
+          "fnr": 0.0479,
+          "precision": 0.8739,
+          "f1": 0.9113,
+          "model": "llama"
+        },
+        {
+          "n": 450,
+          "acc": 0.9689,
+          "catch": 0.9569,
+          "confirm": 0.9731,
+          "bal_acc": 0.965,
+          "fpr": 0.0431,
+          "fnr": 0.0269,
+          "precision": 0.9848,
+          "f1": 0.9789,
+          "model": "mistral"
+        }
+      ],
+      "best_ensemble": {
+        "n": 600,
+        "acc": 0.9367,
+        "catch": 0.9784,
+        "confirm": 0.9181,
+        "bal_acc": 0.9482,
+        "fpr": 0.0216,
+        "fnr": 0.0819,
+        "precision": 0.9896,
+        "f1": 0.9525,
+        "rule": "3-of-3",
+        "k": 3
+      },
+      "best_single": {
+        "n": 450,
+        "acc": 0.9689,
+        "catch": 0.9569,
+        "confirm": 0.9731,
+        "bal_acc": 0.965,
+        "fpr": 0.0431,
+        "fnr": 0.0269,
+        "precision": 0.9848,
+        "f1": 0.9789,
+        "model": "mistral"
+      },
+      "advantage_pp": -1.67
+    },
+    "cot": {
+      "rules": [
+        {
+          "n": 600,
+          "acc": 0.8617,
+          "catch": 0.573,
+          "confirm": 0.9904,
+          "bal_acc": 0.7817,
+          "fpr": 0.427,
+          "fnr": 0.0096,
+          "precision": 0.8388,
+          "f1": 0.9083,
+          "rule": "1-of-3",
+          "k": 1
+        },
+        {
+          "n": 600,
+          "acc": 0.9317,
+          "catch": 0.8703,
+          "confirm": 0.959,
+          "bal_acc": 0.9147,
+          "fpr": 0.1297,
+          "fnr": 0.041,
+          "precision": 0.9431,
+          "f1": 0.951,
+          "rule": "2-of-3",
+          "k": 2
+        },
+        {
+          "n": 600,
+          "acc": 0.7433,
+          "catch": 0.973,
+          "confirm": 0.641,
+          "bal_acc": 0.807,
+          "fpr": 0.027,
+          "fnr": 0.359,
+          "precision": 0.9815,
+          "f1": 0.7755,
+          "rule": "3-of-3",
+          "k": 3
+        }
+      ],
+      "singles": [
+        {
+          "n": 450,
+          "acc": 0.9,
+          "catch": 0.7483,
+          "confirm": 0.9736,
+          "bal_acc": 0.8609,
+          "fpr": 0.2517,
+          "fnr": 0.0264,
+          "precision": 0.8886,
+          "f1": 0.9291,
+          "model": "qwen"
+        },
+        {
+          "n": 450,
+          "acc": 0.8867,
+          "catch": 0.729,
+          "confirm": 0.9695,
+          "bal_acc": 0.8493,
+          "fpr": 0.271,
+          "fnr": 0.0305,
+          "precision": 0.872,
+          "f1": 0.9181,
+          "model": "deepseek"
+        },
+        {
+          "n": 450,
+          "acc": 0.9089,
+          "catch": 0.8467,
+          "confirm": 0.9361,
+          "bal_acc": 0.8914,
+          "fpr": 0.1533,
+          "fnr": 0.0639,
+          "precision": 0.9331,
+          "f1": 0.9346,
+          "model": "llama"
+        },
+        {
+          "n": 450,
+          "acc": 0.6867,
+          "catch": 0.931,
+          "confirm": 0.6018,
+          "bal_acc": 0.7664,
+          "fpr": 0.069,
+          "fnr": 0.3982,
+          "precision": 0.9617,
+          "f1": 0.7403,
+          "model": "mistral"
+        }
+      ],
+      "best_ensemble": {
+        "n": 600,
+        "acc": 0.9317,
+        "catch": 0.8703,
+        "confirm": 0.959,
+        "bal_acc": 0.9147,
+        "fpr": 0.1297,
+        "fnr": 0.041,
+        "precision": 0.9431,
+        "f1": 0.951,
+        "rule": "2-of-3",
+        "k": 2
+      },
+      "best_single": {
+        "n": 450,
+        "acc": 0.9089,
+        "catch": 0.8467,
+        "confirm": 0.9361,
+        "bal_acc": 0.8914,
+        "fpr": 0.1533,
+        "fnr": 0.0639,
+        "precision": 0.9331,
+        "f1": 0.9346,
+        "model": "llama"
+      },
+      "advantage_pp": 2.32
+    },
+    "rubric": {
+      "rules": [
+        {
+          "n": 600,
+          "acc": 0.8667,
+          "catch": 0.5946,
+          "confirm": 0.988,
+          "bal_acc": 0.7913,
+          "fpr": 0.4054,
+          "fnr": 0.012,
+          "precision": 0.8454,
+          "f1": 0.9111,
+          "rule": "1-of-3",
+          "k": 1
+        },
+        {
+          "n": 600,
+          "acc": 0.9183,
+          "catch": 0.8378,
+          "confirm": 0.9542,
+          "bal_acc": 0.896,
+          "fpr": 0.1622,
+          "fnr": 0.0458,
+          "precision": 0.9296,
+          "f1": 0.9417,
+          "rule": "2-of-3",
+          "k": 2
+        },
+        {
+          "n": 600,
+          "acc": 0.6517,
+          "catch": 0.9676,
+          "confirm": 0.5108,
+          "bal_acc": 0.7392,
+          "fpr": 0.0324,
+          "fnr": 0.4892,
+          "precision": 0.9725,
+          "f1": 0.6698,
+          "rule": "3-of-3",
+          "k": 3
+        }
+      ],
+      "singles": [
+        {
+          "n": 450,
+          "acc": 0.8956,
+          "catch": 0.7279,
+          "confirm": 0.9769,
+          "bal_acc": 0.8524,
+          "fpr": 0.2721,
+          "fnr": 0.0231,
+          "precision": 0.881,
+          "f1": 0.9264,
+          "model": "qwen"
+        },
+        {
+          "n": 450,
+          "acc": 0.8867,
+          "catch": 0.7548,
+          "confirm": 0.9559,
+          "bal_acc": 0.8554,
+          "fpr": 0.2452,
+          "fnr": 0.0441,
+          "precision": 0.8812,
+          "f1": 0.9171,
+          "model": "deepseek"
+        },
+        {
+          "n": 450,
+          "acc": 0.9022,
+          "catch": 0.8175,
+          "confirm": 0.9393,
+          "bal_acc": 0.8784,
+          "fpr": 0.1825,
+          "fnr": 0.0607,
+          "precision": 0.9216,
+          "f1": 0.9304,
+          "model": "llama"
+        },
+        {
+          "n": 450,
+          "acc": 0.5644,
+          "catch": 0.931,
+          "confirm": 0.4371,
+          "bal_acc": 0.6841,
+          "fpr": 0.069,
+          "fnr": 0.5629,
+          "precision": 0.9481,
+          "f1": 0.5984,
+          "model": "mistral"
+        }
+      ],
+      "best_ensemble": {
+        "n": 600,
+        "acc": 0.9183,
+        "catch": 0.8378,
+        "confirm": 0.9542,
+        "bal_acc": 0.896,
+        "fpr": 0.1622,
+        "fnr": 0.0458,
+        "precision": 0.9296,
+        "f1": 0.9417,
+        "rule": "2-of-3",
+        "k": 2
+      },
+      "best_single": {
+        "n": 450,
+        "acc": 0.9022,
+        "catch": 0.8175,
+        "confirm": 0.9393,
+        "bal_acc": 0.8784,
+        "fpr": 0.1825,
+        "fnr": 0.0607,
+        "precision": 0.9216,
+        "f1": 0.9304,
+        "model": "llama"
+      },
+      "advantage_pp": 1.76
+    }
+  }
+}

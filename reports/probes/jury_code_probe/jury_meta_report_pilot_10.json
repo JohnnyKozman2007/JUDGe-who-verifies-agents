@@ -1,0 +1,74 @@
+{
+  "team_1": {
+    "n_items": 10,
+    "gt_positives": 7,
+    "gt_negatives": 3,
+    "tp": 6,
+    "tn": 3,
+    "fp": 0,
+    "fn": 1,
+    "accuracy_pct": 90.0,
+    "precision_pct": 100.0,
+    "recall_pct": 85.71,
+    "specificity_pct": 100.0,
+    "fpr_pct": 0.0,
+    "fnr_pct": 14.29,
+    "f1_score": 0.9231,
+    "avg_messages_per_item": 7.5,
+    "total_prompt_tokens": 95001,
+    "total_comp_tokens": 40321,
+    "total_tokens": 135322,
+    "avg_tokens_per_item": 13532.0,
+    "avg_latency_per_item_sec": 107.92,
+    "model_stats": {
+      "gemini_3_1_pro": {
+        "accuracy_pct": 73.7,
+        "total_evals": 19
+      },
+      "claude_opus_4_7": {
+        "accuracy_pct": 78.9,
+        "total_evals": 19
+      },
+      "glm_5_1": {
+        "accuracy_pct": 94.1,
+        "total_evals": 17
+      }
+    }
+  },
+  "team_2": {
+    "n_items": 10,
+    "gt_positives": 7,
+    "gt_negatives": 3,
+    "tp": 7,
+    "tn": 3,
+    "fp": 0,
+    "fn": 0,
+    "accuracy_pct": 100.0,
+    "precision_pct": 100.0,
+    "recall_pct": 100.0,
+    "specificity_pct": 100.0,
+    "fpr_pct": 0.0,
+    "fnr_pct": 0.0,
+    "f1_score": 1.0,
+    "avg_messages_per_item": 3.0,
+    "total_prompt_tokens": 24374,
+    "total_comp_tokens": 36898,
+    "total_tokens": 61272,
+    "avg_tokens_per_item": 6127.0,
+    "avg_latency_per_item_sec": 40.11,
+    "model_stats": {
+      "nemotron_3_super": {
+        "accuracy_pct": 90.0,
+        "total_evals": 10
+      },
+      "kimi_k2_7_code": {
+        "accuracy_pct": 77.8,
+        "total_evals": 9
+      },
+      "instruction_fidelity": {
+        "accuracy_pct": 100.0,
+        "total_evals": 7
+      }
+    }
+  }
+}

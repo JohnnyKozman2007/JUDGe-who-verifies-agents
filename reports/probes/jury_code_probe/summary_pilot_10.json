@@ -1,0 +1,30 @@
+{
+  "run_mode": "pilot_10",
+  "benchmarks": {
+    "qwen / neutral+direct": 98.0,
+    "qwen / self+direct": 97.3,
+    "qwen / other+direct": 96.7
+  },
+  "jury_results": [
+    {
+      "team": "team_1",
+      "team_label": "Team A (The Coverage Jury: Parallel Debate)",
+      "n_items": 10,
+      "accuracy_pct": 90.0,
+      "correct_count": 9,
+      "incorrect_count": 1,
+      "unparsed_count": 0,
+      "avg_messages_per_item": 7.5
+    },
+    {
+      "team": "team_2",
+      "team_label": "Team B (The Precision Jury: Sequential Pipeline)",
+      "n_items": 10,
+      "accuracy_pct": 100.0,
+      "correct_count": 10,
+      "incorrect_count": 0,
+      "unparsed_count": 0,
+      "avg_messages_per_item": 3.0
+    }
+  ]
+}
