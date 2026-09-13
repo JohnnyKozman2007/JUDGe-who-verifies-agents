@@ -8,6 +8,9 @@
     "fp": 0,
     "fn": 1,
     "accuracy_pct": 90.0,
+    "bal_acc_pct": 92.86,
+    "catch_rate_pct": 100.0,
+    "confirm_rate_pct": 85.71,
     "precision_pct": 100.0,
     "recall_pct": 85.71,
     "specificity_pct": 100.0,
@@ -20,6 +23,8 @@
     "total_tokens": 135322,
     "avg_tokens_per_item": 13532.0,
     "avg_latency_per_item_sec": 107.92,
+    "total_cost_dollars": 0.63,
+    "avg_cost_per_item": 0.0633,
     "model_stats": {
       "gemini_3_1_pro": {
         "accuracy_pct": 73.7,
@@ -44,6 +49,9 @@
     "fp": 0,
     "fn": 0,
     "accuracy_pct": 100.0,
+    "bal_acc_pct": 100.0,
+    "catch_rate_pct": 100.0,
+    "confirm_rate_pct": 100.0,
     "precision_pct": 100.0,
     "recall_pct": 100.0,
     "specificity_pct": 100.0,
@@ -56,6 +64,8 @@
     "total_tokens": 61272,
     "avg_tokens_per_item": 6127.0,
     "avg_latency_per_item_sec": 40.11,
+    "total_cost_dollars": 0.07,
+    "avg_cost_per_item": 0.007,
     "model_stats": {
       "nemotron_3_super": {
         "accuracy_pct": 90.0,

@@ -12,19 +12,22 @@ This probe investigates whether a **multi-model deliberative jury**—operating 
 | `qwen / other+direct` | **YES** (full test execution shown) | **96.7%** |
 
 ### Jury Architectures Evaluated (Zero Execution Grounding)
-| Metric | Team A: Parallel Debate | Team B: Sequential Pipeline | Grounded Best (Qwen) |
+| Metric | Team A: Parallel Debate (Zero Grounding) | Team B: Sequential Pipeline (Zero Grounding) | Grounded Baseline: Qwen 72B (Direct + Execution, n=150) |
 |---|:---:|:---:|:---:|
 | **Evaluated Items (n)** | 10 / 150 | 10 / 150 | 150 |
-| **Accuracy** | **90.0%** | **100.0%** | **98.0%** |
-| **Gap to Grounded Best** | **-8.0pp** | **+2.0pp** | Baseline |
-| **Precision (Detecting Correct)** | 100.0% | 100.0% | ~98.5% |
-| **Recall (True Positive Rate)** | 85.71% | 100.0% | ~99.0% |
-| **Specificity (Catching Bugs)** | 100.0% | 100.0% | ~96.0% |
-| **False Negative Rate (Overthinking)** | 14.29% | 0.0% | ~1.0% |
-| **False Positive Rate (Missing Bugs)** | 0.0% | 0.0% | ~4.0% |
-| **F1 Score** | 0.9231 | 1.0 | ~0.987 |
-| **Avg Messages per Problem** | 7.5 | 3.0 | 1.0 |
-| **Avg Tokens per Problem** | 13,532 | 6,127 | ~1,200 |
+| **Raw Accuracy** | **90.00%** | **100.00%** | **98.00%** |
+| **Gap to Grounded (Raw Acc)** | **-8.00pp** | **+2.00pp** | Baseline |
+| **Balanced Accuracy (Primary)** | **92.86%** | **100.00%** | **96.25%** |
+| **Gap to Grounded (Bal Acc)** | **-3.39pp** | **+3.75pp** | Baseline |
+| **Precision (Detecting Correct)** | 100.0% | 100.0% | 98.35% |
+| **Confirm Rate / Recall (TPR)** | 85.71% | 100.0% | 99.17% |
+| **Catch Rate / Specificity (TNR)** | 100.0% | 100.0% | 93.33% |
+| **False Rejection Rate / FNR** | 14.29% | 0.0% | 0.83% |
+| **False Approval Rate / FPR** | 0.0% | 0.0% | 6.67% |
+| **F1 Score** | 0.9231 | 1.0 | 0.9876 |
+| **Avg Tokens per Problem** | 13,532 | 6,127 | 653 |
+| **Total Compute Cost (150 items)** | **$0.63** | **$0.07** | ~$0.03 |
+| **Avg Cost per Problem** | **$0.0633** | **$0.0070** | ~$0.0002 |
 
 ## Detailed Error Analysis & Architecture Dynamics
 

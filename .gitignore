@@ -7,5 +7,7 @@ htmlcov/
 *.log
 .DS_Store
 .env
+*.zip
 # Grade caches live in data/graded/ and ARE committed for reproducibility.
 data/graded_*.json
+

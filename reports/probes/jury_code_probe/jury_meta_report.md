@@ -12,21 +12,22 @@ This probe investigates whether a **multi-model deliberative jury**—operating 
 | `qwen / other+direct` | **YES** (full test execution shown) | **96.7%** |
 
 ### Jury Architectures Evaluated (Zero Execution Grounding)
-| Metric | Team A: Parallel Debate | Team B: Sequential Pipeline | Grounded Best (Qwen) |
+| Metric | Team A: Parallel Debate (Zero Grounding) | Team B: Sequential Pipeline (Zero Grounding) | Grounded Baseline: Qwen 72B (Direct + Execution, n=150) |
 |---|:---:|:---:|:---:|
 | **Evaluated Items (n)** | 150 / 150 | 150 / 150 | 150 |
-| **Raw Accuracy** | **92.7%** | **88.7%** | **98.0%** |
-| **Balanced Accuracy (Primary)** | **86.67%** | **81.67%** | **~93.5%** |
-| **Gap to Grounded Best** | **-5.3pp** | **-9.3pp** | Baseline |
-| **Precision (Detecting Correct)** | 94.31% | 92.56% | ~98.5% |
-| **Confirm Rate / Recall (TPR)** | 96.67% | 93.33% | ~99.0% |
-| **Catch Rate / Specificity (TNR)** | 76.67% | 70.0% | ~96.0% |
-| **False Rejection Rate / FNR** | 3.33% | 6.67% | ~1.0% |
-| **False Approval Rate / FPR** | 23.33% | 30.0% | ~4.0% |
-| **F1 Score** | 0.9547 | 0.9295 | ~0.987 |
-| **Avg Tokens per Problem** | 21,039 | 5,438 | ~1,200 |
-| **Total Compute Cost (150 items)** | **$13.71** | **$0.84** | Baseline |
-| **Avg Cost per Problem** | **$0.0914** | **$0.0056** | Baseline |
+| **Raw Accuracy** | **92.67%** | **88.67%** | **98.00%** |
+| **Gap to Grounded (Raw Acc)** | **-5.33pp** | **-9.33pp** | Baseline |
+| **Balanced Accuracy (Primary)** | **86.67%** | **81.67%** | **96.25%** |
+| **Gap to Grounded (Bal Acc)** | **-9.58pp** | **-14.58pp** | Baseline |
+| **Precision (Detecting Correct)** | 94.31% | 92.56% | 98.35% |
+| **Confirm Rate / Recall (TPR)** | 96.67% | 93.33% | 99.17% |
+| **Catch Rate / Specificity (TNR)** | 76.67% | 70.0% | 93.33% |
+| **False Rejection Rate / FNR** | 3.33% | 6.67% | 0.83% |
+| **False Approval Rate / FPR** | 23.33% | 30.0% | 6.67% |
+| **F1 Score** | 0.9547 | 0.9295 | 0.9876 |
+| **Avg Tokens per Problem** | 21,039 | 5,438 | 653 |
+| **Total Compute Cost (150 items)** | **$13.71** | **$0.84** | ~$0.03 |
+| **Avg Cost per Problem** | **$0.0914** | **$0.0056** | ~$0.0002 |
 
 ## Detailed Error Analysis & Architecture Dynamics
 

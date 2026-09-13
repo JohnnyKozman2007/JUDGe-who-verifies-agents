@@ -25,11 +25,10 @@ from collections import defaultdict
 
 def find_repo_root() -> Path:
     cur = Path(__file__).resolve().parent
-    for _ in range(5):
-        if (cur / "data" / "raw" / "code.jsonl").exists() or (cur / "reports" / "probes").exists():
-            return cur
-        cur = cur.parent
-    return Path.cwd()
+    for p in [cur, cur.parent, cur.parent.parent]:
+        if (p / "reports").exists() or (p / "data").exists():
+            return p
+    return cur.parent
 
 BENCHMARKS = {
     "qwen / neutral+direct": 98.0,
@@ -173,40 +172,58 @@ def generate_markdown_report(metrics_by_team, all_records_by_team, output_path: 
     md.append("")
 
     md.append("### Jury Architectures Evaluated (Zero Execution Grounding)")
-    md.append("| Metric | Team A: Parallel Debate | Team B: Sequential Pipeline | Grounded Best (Qwen) |")
+    # Exact Grounded Qwen benchmark on DeepSeek 150 candidates (verifier=qwen, generator=deepseek, frame=neutral, strategy=direct)
+    qwen_grounded = {
+        "n_items": 150,
+        "raw_acc": 98.00,
+        "bal_acc": 96.25,
+        "precision": 98.35,
+        "recall": 99.17,
+        "specificity": 93.33,
+        "fnr": 0.83,
+        "fpr": 6.67,
+        "f1": 0.9876,
+        "avg_tokens": 653,
+    }
+
+    md.append("| Metric | Team A: Parallel Debate (Zero Grounding) | Team B: Sequential Pipeline (Zero Grounding) | Grounded Baseline: Qwen 72B (Direct + Execution, n=150) |")
     md.append("|---|:---:|:---:|:---:|")
 
     t1_m = metrics_by_team.get("team_1")
     t2_m = metrics_by_team.get("team_2")
 
-    t1_acc = f"{t1_m['accuracy_pct']:.1f}%" if t1_m else "Pending"
-    t2_acc = f"{t2_m['accuracy_pct']:.1f}%" if t2_m else "Pending"
-    t1_gap = f"{t1_m['accuracy_pct'] - best_benchmark:+.1f}pp" if t1_m else "N/A"
-    t2_gap = f"{t2_m['accuracy_pct'] - best_benchmark:+.1f}pp" if t2_m else "N/A"
+    t1_acc = f"{t1_m['accuracy_pct']:.2f}%" if t1_m else "Pending"
+    t2_acc = f"{t2_m['accuracy_pct']:.2f}%" if t2_m else "Pending"
+    t1_raw_gap = f"{t1_m['accuracy_pct'] - qwen_grounded['raw_acc']:+.2f}pp" if t1_m else "N/A"
+    t2_raw_gap = f"{t2_m['accuracy_pct'] - qwen_grounded['raw_acc']:+.2f}pp" if t2_m else "N/A"
 
     t1_bal = f"{t1_m['bal_acc_pct']:.2f}%" if t1_m else "Pending"
     t2_bal = f"{t2_m['bal_acc_pct']:.2f}%" if t2_m else "Pending"
-    md.append(f"| **Evaluated Items (n)** | {t1_m['n_items'] if t1_m else 0} / 150 | {t2_m['n_items'] if t2_m else 0} / 150 | 150 |")
-    md.append(f"| **Raw Accuracy** | **{t1_acc}** | **{t2_acc}** | **{best_benchmark:.1f}%** |")
-    md.append(f"| **Balanced Accuracy (Primary)** | **{t1_bal}** | **{t2_bal}** | **~93.5%** |")
-    md.append(f"| **Gap to Grounded Best** | **{t1_gap}** | **{t2_gap}** | Baseline |")
+    t1_bal_gap = f"{t1_m['bal_acc_pct'] - qwen_grounded['bal_acc']:+.2f}pp" if t1_m else "N/A"
+    t2_bal_gap = f"{t2_m['bal_acc_pct'] - qwen_grounded['bal_acc']:+.2f}pp" if t2_m else "N/A"
+
+    md.append(f"| **Evaluated Items (n)** | {t1_m['n_items'] if t1_m else 0} / 150 | {t2_m['n_items'] if t2_m else 0} / 150 | {qwen_grounded['n_items']} |")
+    md.append(f"| **Raw Accuracy** | **{t1_acc}** | **{t2_acc}** | **{qwen_grounded['raw_acc']:.2f}%** |")
+    md.append(f"| **Gap to Grounded (Raw Acc)** | **{t1_raw_gap}** | **{t2_raw_gap}** | Baseline |")
+    md.append(f"| **Balanced Accuracy (Primary)** | **{t1_bal}** | **{t2_bal}** | **{qwen_grounded['bal_acc']:.2f}%** |")
+    md.append(f"| **Gap to Grounded (Bal Acc)** | **{t1_bal_gap}** | **{t2_bal_gap}** | Baseline |")
     
     if t1_m or t2_m:
-        md.append(f"| **Precision (Detecting Correct)** | {t1_m['precision_pct'] if t1_m else 'N/A'}% | {t2_m['precision_pct'] if t2_m else 'N/A'}% | ~98.5% |")
-        md.append(f"| **Confirm Rate / Recall (TPR)** | {t1_m['recall_pct'] if t1_m else 'N/A'}% | {t2_m['recall_pct'] if t2_m else 'N/A'}% | ~99.0% |")
-        md.append(f"| **Catch Rate / Specificity (TNR)** | {t1_m['specificity_pct'] if t1_m else 'N/A'}% | {t2_m['specificity_pct'] if t2_m else 'N/A'}% | ~96.0% |")
-        md.append(f"| **False Rejection Rate / FNR** | {t1_m['fnr_pct'] if t1_m else 'N/A'}% | {t2_m['fnr_pct'] if t2_m else 'N/A'}% | ~1.0% |")
-        md.append(f"| **False Approval Rate / FPR** | {t1_m['fpr_pct'] if t1_m else 'N/A'}% | {t2_m['fpr_pct'] if t2_m else 'N/A'}% | ~4.0% |")
-        md.append(f"| **F1 Score** | {t1_m['f1_score'] if t1_m else 'N/A'} | {t2_m['f1_score'] if t2_m else 'N/A'} | ~0.987 |")
+        md.append(f"| **Precision (Detecting Correct)** | {t1_m['precision_pct'] if t1_m else 'N/A'}% | {t2_m['precision_pct'] if t2_m else 'N/A'}% | {qwen_grounded['precision']:.2f}% |")
+        md.append(f"| **Confirm Rate / Recall (TPR)** | {t1_m['recall_pct'] if t1_m else 'N/A'}% | {t2_m['recall_pct'] if t2_m else 'N/A'}% | {qwen_grounded['recall']:.2f}% |")
+        md.append(f"| **Catch Rate / Specificity (TNR)** | {t1_m['specificity_pct'] if t1_m else 'N/A'}% | {t2_m['specificity_pct'] if t2_m else 'N/A'}% | {qwen_grounded['specificity']:.2f}% |")
+        md.append(f"| **False Rejection Rate / FNR** | {t1_m['fnr_pct'] if t1_m else 'N/A'}% | {t2_m['fnr_pct'] if t2_m else 'N/A'}% | {qwen_grounded['fnr']:.2f}% |")
+        md.append(f"| **False Approval Rate / FPR** | {t1_m['fpr_pct'] if t1_m else 'N/A'}% | {t2_m['fpr_pct'] if t2_m else 'N/A'}% | {qwen_grounded['fpr']:.2f}% |")
+        md.append(f"| **F1 Score** | {t1_m['f1_score'] if t1_m else 'N/A'} | {t2_m['f1_score'] if t2_m else 'N/A'} | {qwen_grounded['f1']:.4f} |")
         t1_tok = f"{int(t1_m['avg_tokens_per_item']):,}" if t1_m else "N/A"
         t2_tok = f"{int(t2_m['avg_tokens_per_item']):,}" if t2_m else "N/A"
-        md.append(f"| **Avg Tokens per Problem** | {t1_tok} | {t2_tok} | ~1,200 |")
+        md.append(f"| **Avg Tokens per Problem** | {t1_tok} | {t2_tok} | {qwen_grounded['avg_tokens']:,} |")
         t1_cost = f"${t1_m['total_cost_dollars']:.2f}" if t1_m else "N/A"
         t2_cost = f"${t2_m['total_cost_dollars']:.2f}" if t2_m else "N/A"
-        md.append(f"| **Total Compute Cost (150 items)** | **{t1_cost}** | **{t2_cost}** | Baseline |")
+        md.append(f"| **Total Compute Cost (150 items)** | **{t1_cost}** | **{t2_cost}** | ~$0.03 |")
         t1_unit = f"${t1_m['avg_cost_per_item']:.4f}" if t1_m else "N/A"
         t2_unit = f"${t2_m['avg_cost_per_item']:.4f}" if t2_m else "N/A"
-        md.append(f"| **Avg Cost per Problem** | **{t1_unit}** | **{t2_unit}** | Baseline |")
+        md.append(f"| **Avg Cost per Problem** | **{t1_unit}** | **{t2_unit}** | ~$0.0002 |")
     md.append("")
 
     md.append("## Detailed Error Analysis & Architecture Dynamics\n")
@@ -251,7 +268,6 @@ def main():
 
     repo_root = find_repo_root()
     probe_dir = repo_root / "reports" / "probes" / "jury_code_probe"
-    probe_dir.mkdir(parents=True, exist_ok=True)
 
     if args.trace:
         trace_path = Path(args.trace)
