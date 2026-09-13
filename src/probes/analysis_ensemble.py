@@ -23,6 +23,7 @@ import numpy as np
 import pandas as pd
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from analysis_detectability import load_or_build_grades
 
 DOMAINS = ["science", "math", "code"]
@@ -68,9 +69,13 @@ def evaluate(truth, pred):
     tn = int((~truth & ~pred).sum()); fn = int((truth & ~pred).sum())
     tnr = tn / (tn + fp) if (tn + fp) else np.nan
     tpr = tp / (tp + fn) if (tp + fn) else np.nan
+    precision = tp / (tp + fp) if (tp + fp) else np.nan
+    f1 = 2 * precision * tpr / (precision + tpr) if (precision and tpr and not np.isnan(precision) and not np.isnan(tpr) and (precision + tpr) > 0) else np.nan
     return {"n": len(truth), "acc": (tp + tn) / len(truth) if len(truth) else np.nan,
             "catch": tnr, "confirm": tpr, "bal_acc": (tnr + tpr) / 2,
-            "fpr": fp / (fp + tn) if (fp + tn) else np.nan}
+            "fpr": fp / (fp + tn) if (fp + tn) else np.nan,
+            "fnr": fn / (fn + tp) if (fn + tp) else np.nan,
+            "precision": precision, "f1": f1}
 
 
 # ── Step 2a: the k-of-3 sweep on the deployment-realistic pool ────────
@@ -105,7 +110,14 @@ def loo_sweep(df, domain, strategy):
     print(f"  best single judge  : {best_s['model']:8s} bal acc {best_s['bal_acc']*100:.1f}%")
     print(f"  ensemble advantage : {(best_e['bal_acc']-best_s['bal_acc'])*100:+.1f}pp "
           f"(NOTE: both selected in-sample; see Step 3)")
-    return pd.DataFrame(out)
+    return {
+        "df": pd.DataFrame(out),
+        "rules": out,
+        "singles": singles,
+        "best_ensemble": best_e,
+        "best_single": best_s,
+        "advantage": best_e['bal_acc'] - best_s['bal_acc']
+    }
 
 
 # ── Step 2b-clean: subsets WITHOUT self-verification (primary) ────────
@@ -394,14 +406,31 @@ if __name__ == "__main__":
     ap.add_argument("--n-perm", type=int, default=2000)
     a = ap.parse_args()
 
+    domain_reports = {}
     for dom in a.domains:
         suffix = ".jsonl" if a.mode == "actual" else "_pilot.jsonl"
         if not os.path.exists(os.path.join("data", "verified", f"{dom}{suffix}")):
             print(f"\n[{dom}] no verified data, skipping"); continue
         df = build_vote_frame(dom, a.mode, a.frame)
+        domain_reports[dom] = {}
         for strat in a.strategies:
             print(f"\n\n{'#'*78}\n#  {dom.upper()}  /  strategy={strat}  /  frame={a.frame}\n{'#'*78}")
-            loo_sweep(df, dom, strat)
+            res_loo = loo_sweep(df, dom, strat)
+            if res_loo:
+                # Clean for json serialization
+                clean_rules = []
+                for r in res_loo.get("rules", []):
+                    clean_rules.append({k: (round(v, 4) if isinstance(v, (float, np.floating)) else v) for k, v in r.items()})
+                clean_singles = []
+                for s in res_loo.get("singles", []):
+                    clean_singles.append({k: (round(v, 4) if isinstance(v, (float, np.floating)) else v) for k, v in s.items()})
+                domain_reports[dom][strat] = {
+                    "rules": clean_rules,
+                    "singles": clean_singles,
+                    "best_ensemble": {k: (round(v, 4) if isinstance(v, (float, np.floating)) else v) for k, v in res_loo.get("best_ensemble", {}).items()},
+                    "best_single": {k: (round(v, 4) if isinstance(v, (float, np.floating)) else v) for k, v in res_loo.get("best_single", {}).items()},
+                    "advantage_pp": round(res_loo.get("advantage", 0) * 100, 2)
+                }
             subset_sweep_noself(df, dom, strat)
             subset_sweep(df, dom, strat)
             cv_comparison(df, dom, strat)
@@ -409,3 +438,35 @@ if __name__ == "__main__":
             oracle_ceiling(df, dom, strat)
             cv_gain_ci(df, dom, strat)
             diversity_gain(df, dom, strat)
+
+    # Save unified per-domain JSON and Markdown
+    out_dir = os.path.join("reports", "probes", "Do-stronger-models-make-mistakes-that-are-harder-to-catch", "ensemble")
+    os.makedirs(out_dir, exist_ok=True)
+    json_path = os.path.join(out_dir, "ensemble_metrics_by_domain.json")
+    md_path = os.path.join(out_dir, "ensemble_metrics_by_domain.md")
+
+    with open(json_path, "w", encoding="utf-8") as jf:
+        json.dump(domain_reports, jf, indent=2)
+
+    with open(md_path, "w", encoding="utf-8") as mf:
+        mf.write("# Original Paper Ensemble Probe: Per-Domain Metrics Specification\n\n")
+        mf.write("Leave-one-out 3-judge panel (evaluating candidates with non-author models).\n\n")
+        for dom, strats in domain_reports.items():
+            mf.write(f"## Domain: {dom.upper()}\n\n")
+            mf.write("| Strategy | Decision Rule | Balanced Accuracy | Raw Accuracy | Catch (TNR) | Confirm (TPR) | FPR | Precision | F1 | Best Single Judge |\n")
+            mf.write("|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|\n")
+            for strat, data in strats.items():
+                bs = data.get("best_single", {})
+                bs_str = f"{bs.get('model', 'N/A')} ({bs.get('bal_acc', 0)*100:.1f}%)"
+                for r in data.get("rules", []):
+                    prec = f"{r.get('precision', 0)*100:.1f}%" if r.get('precision') is not None else "N/A"
+                    f1_str = f"{r.get('f1', 0):.4f}" if r.get('f1') is not None else "N/A"
+                    mf.write(
+                        f"| `{strat}` | **{r.get('rule')}** | **{r.get('bal_acc', 0)*100:.1f}%** | "
+                        f"{r.get('acc', 0)*100:.1f}% | {r.get('catch', 0)*100:.1f}% | "
+                        f"{r.get('confirm', 0)*100:.1f}% | {r.get('fpr', 0)*100:.1f}% | "
+                        f"{prec} | {f1_str} | {bs_str} |\n"
+                    )
+            mf.write("\n")
+
+    print(f"\n[Saved per-domain ensemble metrics to {json_path} and {md_path}]")
