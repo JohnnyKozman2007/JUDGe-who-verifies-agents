@@ -1,0 +1,92 @@
+
+\documentclass{article} % For LaTeX2e
+\usepackage{iclr2027_conference,times}
+
+% Optional math commands from https://github.com/goodfeli/dlbook_notation.
+\input{math_commands.tex}
+
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{booktabs}
+\usepackage{enumitem}
+
+
+\title{What Actually Fixes an LLM Verifier --- And Why Nothing Else Does}
+
+% The style file substitutes "Anonymous authors / Paper under double-blind review"
+% for everything below until \iclrfinalcopy is uncommented.
+\author{Anonymous authors \\
+Paper under double-blind review}
+
+%\iclrfinalcopy % Uncomment for camera-ready version, but NOT for submission.
+\begin{document}
+
+
+\maketitle
+
+\begin{abstract}
+LLM verifiers have a specific failure shape: they stay accurate at approving correct answers, but collapse at catching wrong ones---and five proposed fixes, tested across 64,800 verifications, all fail in that same shape.
+Specifically, holding the exact error fixed, models approve their own wrong answers 11.9 percentage points more often than other models approve those same answers (across 6,969 strata spanning 779 distinct errors, 95\% CI [$+10.4, +13.5$])---and this gap holds regardless of how authorship is framed (\emph{you wrote this} / \emph{another model wrote this} / \emph{no framing}) or which verification strategy is used (direct verdict, chain-of-thought, or rubric).
+All four verifiers---Qwen2.5-72B, DeepSeek-V3, Llama-3.3-70B, and Mistral-Nemo-12B---show the same asymmetric failure: they confirm correct answers 88.1\% of the time overall, but catch wrong ones only 46.1\% of the time, dropping to 26.4\% in the math domain---a pattern we term \emph{specificity collapse}.
+To understand why, we ran five probes: style transfer (rewriting answers into another model's prose to test fingerprint recognition), self-recognition (asking models to identify their own answer from four candidates), structural self-preference (presenting two wrong answers side by side to test algorithmic favoritism), ensembling (testing whether 3-judge voting panels beat a single judge), and a frontier jury (two deliberating multi-model jury architectures without execution grounding).
+The three mechanism probes all returned near-zero effects: style stripping moved false approval by at most $-1.5$\,pp ($p=0.13$); apparent self-recognition collapsed from $+22.2$\,pp to $+2.8$\,pp once we controlled for the model simply agreeing with its own prior conclusion ($p=0.73$); and structural favoritism, while real at 1.8--3.3$\times$, operates at absolute rates of only 3--13\%---far too small to account for an 11.9\,pp gap.
+Ensembling and jury deliberation failed in the same direction as single judges, not independently of them, pointing to a shared underlying cause rather than a correctable surface bias.
+What remains is \emph{belief persistence}: a model that reached a wrong conclusion during generation still believes that conclusion when reviewing the answer---the same mechanism as confirmation bias in human cognition, where we naturally seek evidence that confirms what we already believe rather than evidence that would disprove it.
+The only intervention that breaks this pattern is an external ground-truth signal: when verifiers are shown execution test results, accuracy reaches 87.7\% on average---against 64.5\% for math and 57.2\% for science where no such signal exists---and a single grounded judge catches 93.3\% of errors compared to 76.7\% for the best deliberating multi-model jury without grounding.
+No verifier-side fix---blinding, better prompting, ensemble aggregation, or multi-model deliberation---can substitute for a ground-truth signal; the reliability ceiling is set by what the environment can verify, not by the model reading it.
+\end{abstract}
+
+\section{Introduction}
+\label{sec:intro}
+% TODO: separate issue. Stub carries the label so cross-references resolve.
+
+\section{Related Work}
+\label{sec:related}
+% TODO: separate issue. Stub carries the label so cross-references resolve.
+
+\input{sections/03_experimental_setup}
+
+\section{Results}
+\label{sec:results}
+% TODO: separate issue. Stub carries the label so cross-references resolve.
+
+\subsection{Belief and Fact of Authorship}
+\label{sec:results-belief}
+% TODO: separate issue.
+
+\subsection{Capability and Detectability}
+\label{sec:results-detect}
+% TODO: separate issue.
+
+\section{Limitations and Future Directions}
+\label{sec:limitations}
+% TODO: separate issue.
+
+\section{Conclusion}
+\label{sec:conclusion}
+% TODO: separate issue.
+
+\subsection*{AI use statement}
+% TODO: required by ICLR 2027, does not count toward the page limit.
+
+\subsection*{Reproducibility statement}
+% TODO: recommended by ICLR 2027, does not count toward the page limit.
+
+\bibliography{refs}
+\bibliographystyle{iclr2027_conference}
+
+\appendix
+
+\section{Execution Harness and Differential Fuzzer}
+\label{app:execution}
+% TODO: separate issue. Stub carries the label so cross-references resolve.
+
+\section{Verification Prompts}
+\label{app:prompts}
+% TODO: separate issue.
+
+\section{Capability and Grounding: Full Breakdown}
+\label{app:capability}
+% TODO: separate issue.
+
+\end{document}
