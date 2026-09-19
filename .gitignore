@@ -11,3 +11,12 @@ htmlcov/
 # Grade caches live in data/graded/ and ARE committed for reproducibility.
 data/graded_*.json
 
+# LaTeX build output
+ICLR/*.aux
+ICLR/*.bbl
+ICLR/*.blg
+ICLR/*.fdb_latexmk
+ICLR/*.fls
+ICLR/*.out
+ICLR/*.pdf
+

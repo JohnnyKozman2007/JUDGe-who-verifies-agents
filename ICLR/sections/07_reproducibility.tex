@@ -1,0 +1,30 @@
+\subsection*{Reproducibility statement}
+
+Every number in this paper is derived from released artifacts. We release all 64{,}800
+verification records with their raw model responses, the 1{,}800 generated candidates, the
+full override audit, and the generation, verification, fuzzing, and reporting harnesses that
+produced them, together with the analysis scripts for every table and figure. An anonymized
+archive accompanies this submission.
+
+The details needed to re-run the grid are in the paper rather than only in the code.
+Section~\ref{sec:setup-models} gives the four model identifiers, the serving provider, the
+decoding temperature, the generation and verification token budgets, and the retry policy.
+Section~\ref{sec:setup-tasks} gives the sampling seed and the per-item seed that fixes
+science option order. Section~\ref{sec:setup-grid} specifies the factorial design.
+Appendix~\ref{app:execution} specifies the execution harness, its resource limits, and the
+differential fuzzer including the input proposer and the adjudicating oracle.
+Appendix~\ref{app:prompts} gives the four prompt components verbatim, the ownership-frame
+sentences, and the verdict parser with its fallback. Appendix~\ref{app:capability} gives the
+item-adjusted estimator.
+
+Two caveats are worth stating plainly. Decoding at temperature~0 through a hosted inference
+API is deterministic in intent but not bit-reproducible in practice: provider-side batching
+and kernel nondeterminism can move individual verdicts between runs. We therefore release
+the traces themselves rather than asking a reader to reproduce them call by call, and every
+statistic in the paper is recomputable from those traces offline. Separately, the
+GPQA-Diamond curators ask that items not be posted in plain text, to limit leakage into
+future training corpora. Our science release therefore ships item identifiers, candidate
+verdicts, and our own outputs, but not the benchmark questions; the exact 150-item sample
+and its option ordering reconstruct from the gated source under the seeds given in
+Section~\ref{sec:setup-tasks}. HumanEval+ and MATH items are redistributed in full under
+their respective licenses.
