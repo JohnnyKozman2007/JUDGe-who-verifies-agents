@@ -798,8 +798,23 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
                 "an LLM oracle adjudicated mismatches. This section quantifies how often the verifier was right "
                 "vs. wrong, and how often the benchmark reference itself was the problem.*\n\n")
 
-        if fuzz_rows:
-            fuzz_df = pd.DataFrame(fuzz_rows)
+        # Restrict to code overrides that actually occurred in the evaluated grid
+        code_overrides_grid = df[(df['domain'] == 'code') & (df['overrode_passing_tests'] == 1)]
+
+        if 'code' not in df['domain'].values:
+            f.write("*(No code domain data present)*\n\n")
+        elif fuzz_rows and not code_overrides_grid.empty:
+            fuzz_raw_df = pd.DataFrame(fuzz_rows)
+            rename_map = {}
+            if 'generator_model' in fuzz_raw_df.columns:
+                rename_map['generator_model'] = 'generator'
+            if 'verifier_model' in fuzz_raw_df.columns:
+                rename_map['verifier_model'] = 'verifier'
+            fuzz_raw_df = fuzz_raw_df.rename(columns=rename_map)
+
+            grid_keys = code_overrides_grid[['item_id', 'generator', 'verifier', 'frame', 'strategy']].drop_duplicates()
+            fuzz_df = grid_keys.merge(fuzz_raw_df, on=['item_id', 'generator', 'verifier', 'frame', 'strategy'], how='inner')
+
             verdict_counts = fuzz_df['fuzz_verdict'].value_counts()
             total_fuzz = len(fuzz_df)
 
@@ -807,12 +822,13 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
             f.write("### Verdict Breakdown\n\n")
             f.write("| Verdict | Count | % of Fuzzed |\n")
             f.write("|---|---|---|\n")
-            verdict_order = ['BUG_CONFIRMED', 'REFERENCE_BUG', 'NO_DISCREPANCY', 'SKIPPED_PIPELINE_FAIL']
+            verdict_order = ['BUG_CONFIRMED', 'REFERENCE_BUG', 'NO_DISCREPANCY', 'SKIPPED_PIPELINE_FAIL', 'ERROR']
             descriptions = {
                 'BUG_CONFIRMED':       'Verifier was right — candidate had a real bug',
                 'REFERENCE_BUG':       '⚠️ Reference (benchmark) was wrong — candidate was actually correct',
                 'NO_DISCREPANCY':      'Verifier was wrong — fuzzer found no difference between candidate and reference',
                 'SKIPPED_PIPELINE_FAIL': 'Oracle/fuzzer could not determine correctness — fell back to basic test result',
+                'ERROR':               'Fuzzer execution or environment error — fell back to basic test result',
             }
             for v in verdict_order:
                 count = int(verdict_counts.get(v, 0))
@@ -829,7 +845,7 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
                         "The verifier's override was justified — the candidate was actually more correct than the reference.*\n\n")
                 if 'item_id' in ref_bug_df.columns:
                     f.write("**Affected item IDs:** " + ", ".join(map(str, sorted(ref_bug_df['item_id'].unique()))) + "\n\n")
-                by_gen = ref_bug_df['generator_model'].value_counts()
+                by_gen = ref_bug_df['generator'].value_counts()
                 f.write("**By generator model (which model's candidate was vindicated):**\n")
                 for model, cnt in by_gen.items():
                     f.write(f"- {model}: {cnt}\n")
@@ -837,7 +853,7 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
 
             # Per-verifier breakdown
             f.write("### Verdicts by Verifier Model\n\n")
-            ver_pivot = fuzz_df.groupby(['verifier_model', 'fuzz_verdict']).size().unstack(fill_value=0)
+            ver_pivot = fuzz_df.groupby(['verifier', 'fuzz_verdict']).size().unstack(fill_value=0)
             for v in verdict_order:
                 if v not in ver_pivot.columns:
                     ver_pivot[v] = 0
@@ -852,7 +868,7 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
 
             # Per-generator breakdown
             f.write("### Verdicts by Generator Model\n\n")
-            gen_pivot = fuzz_df.groupby(['generator_model', 'fuzz_verdict']).size().unstack(fill_value=0)
+            gen_pivot = fuzz_df.groupby(['generator', 'fuzz_verdict']).size().unstack(fill_value=0)
             for v in verdict_order:
                 if v not in gen_pivot.columns:
                     gen_pivot[v] = 0
@@ -873,7 +889,7 @@ def generate_reports_and_plots(df, args, fuzz_errors_removed, science_audit_df=N
                 total = row.sum()
                 justified = int(row.get('BUG_CONFIRMED', 0))
                 unjustified = int(row.get('NO_DISCREPANCY', 0)) + int(row.get('REFERENCE_BUG', 0))
-                inconclusive = int(row.get('SKIPPED_PIPELINE_FAIL', 0))
+                inconclusive = int(row.get('SKIPPED_PIPELINE_FAIL', 0)) + int(row.get('ERROR', 0))
                 f.write(f"| {verifier} | {int(total)} | {justified/max(1,total)*100:.1f}% | {unjustified/max(1,total)*100:.1f}% | {inconclusive/max(1,total)*100:.1f}% |\n")
             f.write("\n")
         else:
