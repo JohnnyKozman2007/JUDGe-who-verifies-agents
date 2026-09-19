@@ -1,0 +1,175 @@
+\section{Experimental Setup}
+\label{sec:setup}
+
+\subsection{Tasks and Domains}
+\label{sec:setup-tasks}
+
+We draw 150 items from each of three benchmarks under a fixed sampling seed (42):
+HumanEval+~\citep{liu2023evalplus} for code, MATH~\citep{hendrycks2021math} for
+mathematics, and GPQA-Diamond~\citep{rein2024gpqa} for graduate-level
+science.\footnote{HumanEval+/EvalPlus is distributed under Apache-2.0 (built on OpenAI's
+HumanEval under MIT); MATH under the MIT License; GPQA-Diamond under CC BY-4.0, accessed
+under its gated-release terms. All assets are used strictly for academic evaluation.}
+
+The domains were chosen not for difficulty but for what the environment can verify.
+Table~\ref{tab:domains} records the distinction the paper turns on. Correctness is
+established by running the candidate in code, by matching a final answer in mathematics,
+and by a multiple-choice letter in science, but only in code does any of that reach the
+judge. Mathematics is therefore a checkable task presented to an unaided judge, and that
+gap is the point: it separates \emph{grounding}, meaning what the judge is shown, from
+\emph{checkability}, meaning what could in principle be confirmed. If verifier reliability
+tracked checkability, math would behave like code.
+
+For science, the four candidate options are shuffled per item under a per-item seed
+($42 + \text{item index}$) and rendered as A through D before the question reaches either
+generator or verifier, so option position carries no information about the answer. Items
+whose options fail a validity check, meaning a count other than four, an empty option, or
+two options with identical normalized text, are discarded before the 150-item sample is
+filled.
+
+\begin{table}[t]
+\caption{The three domains differ in whether a mechanical check exists and, separately, in
+whether the judge is shown one. Only code verifications receive an environment signal.}
+\label{tab:domains}
+\begin{center}
+\small
+\begin{tabular}{llll}
+\toprule
+\bf Domain & \bf Benchmark & \bf Correctness established by & \bf Signal shown to judge \\
+\midrule
+Code    & HumanEval+   & Execution against the test harness     & Execution result block \\
+Math    & MATH         & Final-answer extraction, numeric match & None \\
+Science & GPQA-Diamond & Option letter; ambiguous parses fail    & None \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{table}
+
+\subsection{Models}
+\label{sec:setup-models}
+
+The same four instruction-tuned models act as both generators and verifiers:
+Qwen2.5-72B-Instruct, DeepSeek-V3, Llama-3.3-70B-Instruct-Turbo, and
+Mistral-Nemo-Instruct-2407. All are served
+through DeepInfra at temperature~0, with a 2500-token budget for generation and 2000 for
+verification, and up to two retries on transport failure. The study is inference-only and
+needs no local GPU: the full grid consumes 51.8M prompt and 3.15M completion tokens across
+the 64{,}800 verification calls, alongside a CPU-only subprocess harness for code
+execution.
+
+The pool deliberately spans a wide capability range, from a 12B dense model to a
+671B-parameter mixture of experts. Section~\ref{sec:results-detect} exploits that spread to
+ask whether stronger generators produce harder-to-catch errors;
+Section~\ref{sec:limitations} notes it as a confound for any model-level ranking.
+
+\subsection{The Verification Grid}
+\label{sec:setup-grid}
+
+Every model produces a candidate for every item, with no generation failures, giving 1{,}800
+candidates. Every model then verifies every candidate. Each verification varies two factors
+independently.
+
+The \emph{authorship frame} tells the judge the answer is its own (\textsc{self}), another
+model's (\textsc{other}), or says nothing (\textsc{neutral}). Prompts are identical apart
+from that single sentence, and no model is ever named, so the frame carries a claim about
+authorship and nothing else. The \emph{verification strategy} requests a bare verdict
+(\textsc{direct}), a brief chain of thought before the verdict (\textsc{cot}), or a
+rubric-scored assessment (\textsc{rubric}); the evaluation criteria themselves are held
+constant across the three. Crossing four generators, four verifiers, three frames and three
+strategies yields $4\times4\times3\times3 = 144$ verifications per item and 64{,}800 in
+total.
+
+The design's load-bearing property is that the told frame is crossed with the true
+generator and verifier identity rather than confounded with it. A judge told ``you wrote
+this'' is usually being misinformed, and a judge told nothing is sometimes grading its own
+work. Comparing frames at fixed true authorship isolates the \emph{belief} of authorship;
+comparing true authorship at a fixed frame isolates the \emph{fact} of it.
+Section~\ref{sec:results-belief} reports both.
+
+One verification in four has a model grading its own candidate. Those 16{,}200 rows are the
+object of study in Section~\ref{sec:results-belief}, and are excluded from every analysis
+that compares judges to one another, namely detectability, oversight and ensembling, so
+that self-preference cannot inflate a cross-judge comparison.
+
+\subsection{Execution Grounding and Differential Fuzzing}
+\label{sec:setup-grounding}
+
+Code verifications, and only code verifications, carry a block reporting what happened when
+the candidate was actually run against the benchmark's harness: exit status, exit code, the
+number of assertions passed, captured output, and the final traceback frame on failure.
+Runs exceeding a five-second budget are reported to the judge as a timeout rather than a
+failure. The prompt states that the block is a runtime signal rather than the final word,
+and explicitly permits the judge to mark passing code incorrect on logical grounds. That
+permission is deliberate: it makes judge-initiated deviation from the environment signal
+observable. Of the 21{,}600 code verifications, 1{,}458 (6.8\%) are such deviations, where
+the judge rejected a candidate the harness had passed.
+
+Adjudicating an override requires a check independent of both the harness and the judge, so
+we fuzz each one differentially. A model outside the evaluated pool
+(Gemma-2-27B-Instruct) proposes fifteen adversarial inputs aimed at boundary and edge
+behavior; the candidate and the benchmark's reference solution are both run on them (median
+15 input sets executed per override, maximum 83); and a second independent model
+(WizardLM-2-8x22B) adjudicates any divergence, deciding which of the two outputs is correct.
+We treat the oracle's verdict as a soft signal, since the oracle is itself unevaluated.
+Each override lands in one of three resolved verdicts:
+
+\begin{itemize}[nosep]
+  \item \textbf{\texttt{NO\_DISCREPANCY}} (1{,}125 overrides, 77.2\%): no divergence was
+    found within the budget. The judge rejected code that behaves exactly like the
+    reference.
+  \item \textbf{\texttt{BUG\_CONFIRMED}} (107, 7.3\%): a divergence was found and the
+    oracle judged the candidate wrong. The test suite was incomplete and the judge was
+    right to override it.
+  \item \textbf{\texttt{REFERENCE\_BUG}} (11, 0.8\%): a divergence was found and the oracle
+    judged the benchmark's own reference solution to be the flawed one.
+\end{itemize}
+
+The remaining 215 overrides (14.7\%) are unresolved: 168 (11.5\%) where the input-generation
+step failed and 47 (3.2\%) where the fuzzer itself errored. These keep the harness verdict.
+
+Two consequences carry into the rest of the paper. First, the fuzzer sits inside the
+measurement loop rather than beside it. \texttt{BUG\_CONFIRMED} relabels a candidate as
+incorrect, and \texttt{NO\_DISCREPANCY} and \texttt{REFERENCE\_BUG} relabel it as correct,
+so every result is reported against both the raw harness labels and these
+\emph{fuzz-adjusted} labels. Second, reference-solution bugs are rare but real: across every
+override fuzzed, the oracle flagged the HumanEval+ reference itself on five items
+(\texttt{HumanEval\_17}, \texttt{\_59}, \texttt{\_78}, \texttt{\_126} and
+\texttt{\_134}), and the eleven \texttt{REFERENCE\_BUG} verdicts inside this grid fall on
+four of those five. Even a gold-standard suite has blind spots, which is an argument for
+grounding judges in execution rather than an argument against it.
+Appendix~\ref{app:execution} gives the harness, its resource limits, and the fuzzer in full.
+
+\subsection{Metrics}
+\label{sec:setup-metrics}
+
+Verifiers return JSON, and a verdict is read from a single boolean \texttt{is\_correct}
+field. Of the 64{,}800 calls, 277 (0.43\%) did not return parseable JSON; for all 277 a
+regex fallback recovered the verdict from the raw response
+(Appendix~\ref{app:prompts}), so no call was discarded and every analysis below runs on the
+full 64{,}800. The strict-parse failures are concentrated rather than diffuse: 262 come from
+the smallest model (Mistral-Nemo) and 15 from Llama; 140 are \textsc{rubric} and 137
+\textsc{cot}, with none from \textsc{direct}; 267 are math and 10 science, with none from
+code.
+
+We report the following, computed at the item level throughout:
+
+\begin{itemize}[nosep]
+  \item \textbf{Accuracy} (\%): proportion of verdicts matching the ground-truth correctness
+    label (correct candidate $\to$ approved; incorrect candidate $\to$ rejected).
+  \item \textbf{Balanced accuracy}: the arithmetic mean of true-positive rate (TPR,
+    sensitivity) and true-negative rate (TNR, specificity),
+    $\tfrac{1}{2}(\mathrm{TPR}+\mathrm{TNR})$. This is our \emph{primary metric}, because
+    accuracy alone hides the asymmetry the paper is about.
+  \item \textbf{False-positive rate (FPR)}, equivalently the \textbf{false-approval rate}:
+    the rate at which incorrect candidates are approved,
+    $\mathrm{FP}/(\mathrm{FP}+\mathrm{TN})$.
+  \item \textbf{False-negative rate (FNR)}, equivalently the \textbf{false-rejection rate}:
+    the rate at which correct candidates are rejected,
+    $\mathrm{FN}/(\mathrm{FN}+\mathrm{TP})$.
+  \item \textbf{Item-adjusted approval rate}, used in Section~\ref{sec:results-detect} only:
+    the within-item demeaned false-approval rate, which removes item difficulty as a
+    confound when comparing generators.\footnote{Two senses of ``adjusted'' appear in this
+    paper and we keep them apart: \emph{fuzz-adjusted} refers to the ground-truth
+    relabeling of Section~\ref{sec:setup-grounding}, and \emph{item-adjusted} refers to
+    within-item demeaning.} Appendix~\ref{app:capability} gives the exact estimator.
+\end{itemize}
