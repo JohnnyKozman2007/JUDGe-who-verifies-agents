@@ -15,17 +15,9 @@ The domains were chosen not for difficulty but for what the environment can veri
 Table~\ref{tab:domains} records the distinction the paper turns on. Correctness is
 established by running the candidate in code, by matching a final answer in mathematics,
 and by a multiple-choice letter in science, but only in code does any of that reach the
-judge. Mathematics is therefore a checkable task presented to an unaided judge, and that
-gap is the point: it separates \emph{grounding}, meaning what the judge is shown, from
-\emph{checkability}, meaning what could in principle be confirmed. If verifier reliability
-tracked checkability, math would behave like code.
+judge. Mathematics is therefore a checkable task presented to an unaided judge, separating \emph{grounding} (what the judge sees) from \emph{checkability} (what could be confirmed); if verifier reliability tracked checkability, math would behave like code.
 
-For science, the four candidate options are shuffled per item under a per-item seed
-($42 + \text{item index}$) and rendered as A through D before the question reaches either
-generator or verifier, so option position carries no information about the answer. Items
-whose options fail a validity check, meaning a count other than four, an empty option, or
-two options with identical normalized text, are discarded before the 150-item sample is
-filled.
+For science, candidate options are shuffled per item under a per-item seed ($42 + \text{item index}$) and rendered as A through D before reaching models, so option position carries no answer signal. Items failing validity checks (non-four count, empty option, or duplicate text) are discarded before the 150-item sample is filled.
 
 \begin{table}[t]
 \caption{The three domains differ in whether a mechanical check exists and, separately, in
@@ -52,10 +44,7 @@ The same four instruction-tuned models act as both generators and verifiers:
 Qwen2.5-72B-Instruct, DeepSeek-V3, Llama-3.3-70B-Instruct-Turbo, and
 Mistral-Nemo-Instruct-2407. All are served
 through DeepInfra at temperature~0, with a 2500-token budget for generation and 2000 for
-verification, and up to two retries on transport failure. The study is inference-only and
-needs no local GPU: the full grid consumes 51.8M prompt and 3.15M completion tokens across
-the 64{,}800 verification calls, alongside a CPU-only subprocess harness for code
-execution.
+verification, with up to two retries on transport failure. The study is inference-only: the full grid consumes 51.8M prompt and 3.15M completion tokens across the 64{,}800 verification calls, alongside a CPU-only subprocess harness for code execution.
 
 The pool deliberately spans a wide capability range, from a 12B dense model to a
 671B-parameter mixture of experts. Section~\ref{sec:results-detect} exploits that spread to
@@ -76,15 +65,9 @@ authorship and nothing else. The \emph{verification strategy} requests a bare ve
 (\textsc{direct}), a brief chain of thought before the verdict (\textsc{cot}), or a
 rubric-scored assessment (\textsc{rubric}); the evaluation criteria themselves are held
 constant across the three. Crossing four generators, four verifiers, three frames and three
-strategies yields $4\times4\times3\times3 = 144$ verifications per item and 64{,}800 in
-total.
+strategies yields 144 evaluations per item, totaling 64{,}800 verification trials across 450 benchmark items and 1{,}800 unique candidates. To account for repeated evaluations over fixed items, all subsequent statistical tests and bootstrap confidence intervals are clustered at the item level.
 
-The design's load-bearing property is that the told frame is crossed with the true
-generator and verifier identity rather than confounded with it. A judge told ``you wrote
-this'' is usually being misinformed, and a judge told nothing is sometimes grading its own
-work. Comparing frames at fixed true authorship isolates the \emph{belief} of authorship;
-comparing true authorship at a fixed frame isolates the \emph{fact} of it.
-Section~\ref{sec:results-belief} reports both.
+The design's core property is that the told frame is crossed with true generator identity rather than confounded with it: comparing frames at fixed true authorship isolates the \emph{belief} of authorship, while comparing true authorship at a fixed frame isolates the \emph{fact} of it (\S\ref{sec:results-belief}).
 
 One verification in four has a model grading its own candidate. Those 16{,}200 rows are the
 object of study in Section~\ref{sec:results-belief}, and are excluded from every analysis
@@ -111,18 +94,7 @@ behavior; the candidate and the benchmark's reference solution are both run on t
 15 input sets executed per override, maximum 83); and a second independent model
 (WizardLM-2-8x22B) adjudicates any divergence, deciding which of the two outputs is correct.
 We treat the oracle's verdict as a soft signal, since the oracle is itself unevaluated.
-Each override lands in one of three resolved verdicts:
-
-\begin{itemize}[nosep]
-  \item \textbf{\texttt{NO\_DISCREPANCY}} (1{,}125 overrides, 77.2\%): no divergence was
-    found within the budget. The judge rejected code that behaves exactly like the
-    reference.
-  \item \textbf{\texttt{BUG\_CONFIRMED}} (107, 7.3\%): a divergence was found and the
-    oracle judged the candidate wrong. The test suite was incomplete and the judge was
-    right to override it.
-  \item \textbf{\texttt{REFERENCE\_BUG}} (11, 0.8\%): a divergence was found and the oracle
-    judged the benchmark's own reference solution to be the flawed one.
-\end{itemize}
+Each override lands in one of three resolved verdicts: \textbf{\texttt{NO\_DISCREPANCY}} (1{,}125 overrides, 77.2\%), where no divergence was found within the budget and the judge rejected code behaving like the reference; \textbf{\texttt{BUG\_CONFIRMED}} (107, 7.3\%), where a divergence was found and the oracle confirmed a genuine candidate bug; or \textbf{\texttt{REFERENCE\_BUG}} (11, 0.8\%), where the oracle judged the benchmark's own reference solution to be flawed.
 
 The remaining 215 overrides (14.7\%) are unresolved: 168 (11.5\%) where the input-generation
 step failed and 47 (3.2\%) where the fuzzer itself errored. These keep the harness verdict.
@@ -151,25 +123,4 @@ the smallest model (Mistral-Nemo) and 15 from Llama; 140 are \textsc{rubric} and
 \textsc{cot}, with none from \textsc{direct}; 267 are math and 10 science, with none from
 code.
 
-We report the following, computed at the item level throughout:
-
-\begin{itemize}[nosep]
-  \item \textbf{Accuracy} (\%): proportion of verdicts matching the ground-truth correctness
-    label (correct candidate $\to$ approved; incorrect candidate $\to$ rejected).
-  \item \textbf{Balanced accuracy}: the arithmetic mean of true-positive rate (TPR,
-    sensitivity) and true-negative rate (TNR, specificity),
-    $\tfrac{1}{2}(\mathrm{TPR}+\mathrm{TNR})$. This is our \emph{primary metric}, because
-    accuracy alone hides the asymmetry the paper is about.
-  \item \textbf{False-positive rate (FPR)}, equivalently the \textbf{false-approval rate}:
-    the rate at which incorrect candidates are approved,
-    $\mathrm{FP}/(\mathrm{FP}+\mathrm{TN})$.
-  \item \textbf{False-negative rate (FNR)}, equivalently the \textbf{false-rejection rate}:
-    the rate at which correct candidates are rejected,
-    $\mathrm{FN}/(\mathrm{FN}+\mathrm{TP})$.
-  \item \textbf{Item-adjusted approval rate}, used in Section~\ref{sec:results-detect} only:
-    the within-item demeaned false-approval rate, which removes item difficulty as a
-    confound when comparing generators.\footnote{Two senses of ``adjusted'' appear in this
-    paper and we keep them apart: \emph{fuzz-adjusted} refers to the ground-truth
-    relabeling of Section~\ref{sec:setup-grounding}, and \emph{item-adjusted} refers to
-    within-item demeaning.} Appendix~\ref{app:capability} gives the exact estimator.
-\end{itemize}
+We report the following item-level metrics throughout: (1)~\textbf{Accuracy} (\%): proportion of verdicts matching the ground-truth correctness label (correct $\to$ approved; incorrect $\to$ rejected); (2)~\textbf{Balanced accuracy}: the arithmetic mean of true-positive rate (TPR, sensitivity) and true-negative rate (TNR, specificity), $\tfrac{1}{2}(\mathrm{TPR}+\mathrm{TNR})$ (our \emph{primary metric}, as accuracy alone obscures specificity collapse); (3)~\textbf{False-positive rate (FPR)} / \textbf{false-approval rate}: the rate at which incorrect candidates are approved, $\mathrm{FP}/(\mathrm{FP}+\mathrm{TN})$; (4)~\textbf{False-negative rate (FNR)} / \textbf{false-rejection rate}: the rate at which correct candidates are rejected, $\mathrm{FN}/(\mathrm{FN}+\mathrm{TP})$; and (5)~\textbf{Item-adjusted approval rate} (Section~\ref{sec:results-detect} only): the within-item demeaned false-approval rate, removing item difficulty as a confound across generators.\footnote{Two senses of ``adjusted'' appear in this paper: \emph{fuzz-adjusted} refers to ground-truth relabeling (\S\ref{sec:setup-grounding}), while \emph{item-adjusted} refers to within-item demeaning (Appendix~\ref{app:capability}).}

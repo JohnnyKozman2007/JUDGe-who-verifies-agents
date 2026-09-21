@@ -1,37 +1,4 @@
 \section{Limitations and Future Directions}
 \label{sec:limitations}
 
-Six constraints bound these results. First, the design is single-turn: we do not evaluate
-multi-turn agentic loops, where a verifier's judgment feeds back into generation and the
-generator gets to answer the critique. Second, grounding is a property of our design rather
-than of the domains. Mathematics has a checkable final answer that we deliberately withheld
-from the judge, so our contrast is between a clean environment signal and none at all, and
-we cannot say how verifiers behave under a partial, noisy, or adversarial one. Third,
-correctness in the code domain is defined by the same execution result the judge is shown,
-so code accuracy partly measures whether a judge reads that signal off correctly rather
-than independent code comprehension; the code prompt also explicitly permits overriding
-execution, which inflates override rates relative to a neutral instruction. Fourth, the
-override audit is LLM-mediated at both ends: one model proposes the adversarial inputs and
-a second adjudicates divergences, neither independently validated, over a bounded input
-budget. \texttt{NO\_DISCREPANCY} therefore means no divergence was found rather than that
-none exists, 14.7\% of overrides never resolved at all, and because these verdicts relabel
-ground truth, that uncertainty propagates into every fuzz-adjusted number we report. Fifth,
-the judge pool is four open-weight models served by a single provider, one 12B model against
-three 70B-class models and no closed frontier system, so any model-level ranking confounds
-capability with scale, with provider serving stack, and with output-format compliance: the
-12B model produced 262 of the 277 strict-parse failures, and while the regex fallback
-recovered every one of them, a model that formats worse may also reason differently. Sixth,
-each cell is a single draw at temperature~0 over 150 items from one benchmark per domain.
-Our intervals come from stratifying across items and errors, not from decoding variance, and
-we cannot rule out benchmark contamination in models whose training corpora are undisclosed.
-
-These point to three directions. Extending grounding to new domains, formal provers for
-mathematics and retrieval pipelines for science, would convert our cross-domain contrast
-into a within-domain ablation and show how verifiers handle partial or noisy signals rather
-than only the two endpoints. Because judges share correlated blind spots precisely where
-grounding is absent, training regimes that deliberately decorrelate judges are more
-promising than larger panels drawn from the same distribution, which is what our ensemble
-results already show. And because self-preference tracks the conclusion a model still holds
-rather than the text it wrote, interventions that perturb a verifier's prior are better
-targets than authorship blinding: forcing an independent re-derivation before the verdict,
-or verifying against a conclusion the judge did not produce.
+Nine constraints bound our findings. First, evaluation is single-turn, leaving iterative loops unexamined. Second, grounding varies across benchmarks rather than within them: math answers were withheld to contrast execution against unaided reasoning. Third, our 15-input fuzzing audit cannot prove code is bug-free, so overrides are unconfirmed defects rather than provable bugs. Fourth, in math and science, regex extraction and GPQA label noise make ungrounded catch rates (e.g., $26.4\%$ in math) lower bounds. Fifth, the style probe tested two models with 100\% baseline false approval, introducing potential regression to the mean without altering code style. Sixth, the judge pool spans four open-weight models from one provider, omitting proprietary systems (e.g., o1). Seventh, juries and prompt sweeps were benchmarked on $n = 150$ HumanEval+ items ($\text{temperature}=0$), which cannot rule out training contamination. Eighth, single-sentence attribution (``you wrote this'') is a weak manipulation for stateless models. Ninth, instructing verifiers not to re-solve from scratch may structurally bias toward belief persistence by preventing independent re-derivation. Future work includes formal provers, retrieval, and decorrelating training regimes.

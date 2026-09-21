@@ -4,7 +4,7 @@ Every number in this paper is derived from released artifacts. We release all 64
 verification records with their raw model responses, the 1{,}800 generated candidates, the
 full override audit, and the generation, verification, fuzzing, and reporting harnesses that
 produced them, together with the analysis scripts for every table and figure. An anonymized
-archive accompanies this submission.
+repository accompanies this submission (\url{https://anonymous.4open.science/r/JUDGe-who-verifies-agents-6A34/}).
 
 The details needed to re-run the grid are in the paper rather than only in the code.
 Section~\ref{sec:setup-models} gives the four model identifiers, the serving provider, the
@@ -15,7 +15,8 @@ Appendix~\ref{app:execution} specifies the execution harness, its resource limit
 differential fuzzer including the input proposer and the adjudicating oracle.
 Appendix~\ref{app:prompts} gives the four prompt components verbatim, the ownership-frame
 sentences, and the verdict parser with its fallback. Appendix~\ref{app:capability} gives the
-item-adjusted estimator.
+item-adjusted estimator. Appendix~\ref{app:models} lists all model strings, parameter counts,
+and serving providers.
 
 Two caveats are worth stating plainly. Decoding at temperature~0 through a hosted inference
 API is deterministic in intent but not bit-reproducible in practice: provider-side batching

@@ -6,8 +6,15 @@
 
 \usepackage{hyperref}
 \usepackage{url}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amsfonts}
 \usepackage{booktabs}
 \usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{float}
+\usepackage{placeins}
+\graphicspath{{figures/}{./}}
 
 \title{What Actually Fixes an LLM Verifier --- And Why Nothing Else Does}
 
@@ -16,23 +23,6 @@
 % =========================================================================
 \author{Anonymous authors \\
 Paper under double-blind review}
-
-% =========================================================================
-% CAMERA-READY ONLY: Keep commented out until paper acceptance
-% =========================================================================
-% \author{%
-%   Tilak Parajuli\thanks{Equal contribution.} \\
-%   Tribhuvan University \\
-%   \texttt{tilak.765421@bkmc.tu.edu.np} \\
-%   \And
-%   Johnny Kozman\footnotemark[1] \\
-%   University of Hertfordshire \\
-%   \texttt{jg25abs@herts.ac.uk} \\
-%   \And
-%   Arushi Waddepalli\footnotemark[1] \\
-%   Indian Institute of Information Technology, Lucknow \\
-%   \texttt{lit2024009@iiitl.ac.in}
-% }
 
 %\iclrfinalcopy % Keep commented out for submission; uncomment ONLY for camera-ready.
 \begin{document}
@@ -48,20 +38,24 @@ Paper under double-blind review}
 
 \input{sections/03_experimental_setup}
 
-\section{Results}
-\label{sec:results}
-
-\subsection{Belief and Fact of Authorship}
-\label{sec:results-belief}
-
-\subsection{Capability and Detectability}
-\label{sec:results-detect}
+\input{sections/04_results}
 
 \input{sections/05_limitations}
 
 \input{sections/06_conclusion}
 
 \subsection*{AI use statement}
+In this work, we used generative AI tools (Claude and Gemini) for:
+(1) generating and debugging experimental code and evaluation harnesses;
+(2) assisting in identifying relevant literature and related work;
+(3) generating initial text drafts and iteratively refining and polishing prose; and
+(4) auditing the manuscript for \LaTeX{} formatting issues, consistency errors, and numerical discrepancies.
+Generative AI tools were not used for the original scientific conceptualization or the design of the experimental probes, which were developed entirely by the authors. 
+All AI-assisted outputs were manually inspected, tested, and verified by the authors: all code was tested for correctness against our execution harness, all related work citations and summaries were verified against original publications, and all reported statistics were checked directly against the raw experimental run traces. 
+We take full responsibility for the final content of this work, including all text, claims, and artifacts produced with the aid of generative AI.
+
+\subsection*{Ethics statement}
+This work evaluates public language models on standard benchmark datasets. It does not involve human subjects, private personal data, or potential dual-use applications.
 
 \input{sections/07_reproducibility}
 
@@ -70,13 +64,6 @@ Paper under double-blind review}
 
 \appendix
 
-\section{Execution Harness and Differential Fuzzer}
-\label{app:execution}
-
-\section{Verification Prompts}
-\label{app:prompts}
-
-\section{Capability and Grounding: Full Breakdown}
-\label{app:capability}
+\input{sections/appendix}
 
 \end{document}

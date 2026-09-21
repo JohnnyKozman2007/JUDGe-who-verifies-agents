@@ -1,0 +1,371 @@
+% =========================================================================
+% ICLR 2027 APPENDIX: WHAT ACTUALLY FIXES AN LLM VERIFIER
+% =========================================================================
+
+\section{Execution Harness and Differential Fuzzer}
+\label{app:execution}
+
+\subsection{Code Execution Sandbox and Runtime Telemetry}
+To evaluate candidate code solutions under environmental execution grounding, we implement a dedicated execution harness built upon Python's \texttt{subprocess} isolation. Candidate solutions for HumanEval+ are executed against the benchmark's comprehensive unit test suite in an isolated environment.
+
+Each execution is constrained by the following parameters:
+\begin{itemize}[nosep, leftmargin=*]
+  \item \textbf{Timeout Limit:} 5.0 seconds per test run to catch infinite loops or blocking operations. Exceeded budgets are reported as \texttt{TIMEOUT}.
+  \item \textbf{Process Isolation:} Subprocesses run with fresh namespaces, preventing state leakage or file-system pollution across evaluations.
+  \item \textbf{Captured Telemetry:} The harness captures system exit codes, standard output (\texttt{stdout}), standard error (\texttt{stderr}), the total number of passing assertions prior to failure, and the terminal traceback frame if an unhandled exception is raised.
+\end{itemize}
+
+When code verification is performed, this execution summary is formatted into a structured telemetry block and injected directly into the verifier's prompt context:
+\begin{quote}
+\small\ttfamily
+--- EXECUTION RESULTS ---\\
+Status: [Passed / Failed / Timeout / Syntax Error]\\
+Exit Code: [0 / 1 / etc.]\\
+Assertions Passed: [X / Total]\\[3pt]
+{[}If Failed, Captured Error Frame:{]}\\
+Traceback (most recent call last):\\
+\ \ File "solution.py", line 14, in <module>\\
+AssertionError: Expected [Expected\_Output], Got [Candidate\_Output]
+\end{quote}
+The prompt explicitly informs the evaluator that this execution telemetry represents empirical runtime behavior, but permits the model to mark passing code as incorrect if it identifies latent algorithmic or logical defects not exercised by the test suite.
+
+\subsection{Differential Fuzzing Architecture for Disputed Overrides}
+When an LLM verifier overrides a passing test suite—classifying an execution-passing solution as incorrect—we adjudicate whether the override reflects a genuine uncovered defect or an evaluator hallucination using an automated differential fuzzer.
+
+\paragraph{Pipeline Components:}
+\begin{enumerate}[nosep, leftmargin=*]
+  \item \textbf{Adversarial Input Generation:} An independent external model, \texttt{Gemma-2-27B-IT}, is prompted with the problem specification, the candidate implementation, and the benchmark's reference solution. It is instructed to generate 15 targeted, adversarial input arguments designed specifically to probe edge-case discrepancies (e.g., boundary values, empty sequences, negative bounds, zero conditions, and extreme thresholds).
+  \item \textbf{Differential Dual Execution:} Both the candidate solution and the gold-standard reference implementation are executed on each generated input in isolated subprocesses (subject to a 2.0-second timeout per trial).
+  \item \textbf{Oracle Adjudication:} If the candidate and reference outputs diverge on any input, a second independent frontier model, \texttt{WizardLM-2-8x22B}, serves as an impartial oracle. The oracle receives the task description, the specific input arguments, and the respective outputs, adjudicating which implementation adhered to the problem specification.
+\end{enumerate}
+
+\paragraph{Verdict Taxonomy and Complete Audit Breakdown:}
+Across all $21{,}600$ code verification calls in the main evaluation grid, models generated $1{,}458$ overrides against passing test suites ($6.75\%$ override rate). The differential fuzzing audit categorized each override into one of three resolved states:
+\begin{itemize}[nosep, leftmargin=*]
+  \item \textbf{\texttt{NO\_DISCREPANCY}} ($1{,}125$ cases, $77.16\%$): The fuzzer completed all input trials without detecting behavioral divergence between candidate and reference implementations. The verifier's override represents an unconfirmed defect under our 15-input fuzzing budget.
+  \item \textbf{\texttt{BUG\_CONFIRMED}} ($107$ cases, $7.34\%$): The fuzzer discovered an adversarial input where outputs diverged, and the oracle confirmed that the candidate implementation was flawed. The test harness was incomplete, and the verifier correctly caught an edge-case bug.
+  \item \textbf{\texttt{REFERENCE\_BUG}} ($11$ cases, $0.75\%$): Outputs diverged, but the oracle ruled that the candidate code was correct while the benchmark's gold reference implementation was erroneous.
+\end{itemize}
+The remaining $215$ cases ($14.75\%$) were unresolved due to pipeline failures: $168$ cases ($11.52\%$) where input type inference or JSON parsing failed during generation, and $47$ cases ($3.22\%$) where runtime fuzzing encountered subprocess execution errors. These cases retain their raw test harness status.
+
+\paragraph{Identified Reference Flaws in Benchmark Data:}
+The fuzzer identified genuine defects in the HumanEval+ gold reference solutions across five distinct benchmark problems: \texttt{HumanEval/17}, \texttt{HumanEval/59}, \texttt{HumanEval/78}, \texttt{HumanEval/126}, and \texttt{HumanEval/134}. The $11$ \texttt{REFERENCE\_BUG} verdicts within our grid were concentrated on four of these items.
+
+% =========================================================================
+\section{Verification Prompts and Formatting Schemas}
+\label{app:prompts}
+
+\subsection{Prompt Composition Architecture}
+All prompts evaluated in this study are dynamically constructed via \texttt{src/prompts.py} through four sequential modular components:
+\begin{enumerate}[nosep, leftmargin=*]
+  \item \textbf{Base Task:} The problem specification or question.
+  \item \textbf{Authorship Framing Clause:} A single sentence defining the attributed author identity.
+  \item \textbf{Domain Guidelines:} Shared and domain-specific verification instructions.
+  \item \textbf{Strategy Specification:} Direct, chain-of-thought, or rubric evaluation formatting instructions.
+\end{enumerate}
+
+\subsection{Authorship Framing Templates}
+The authorship framing manipulation alters only a single sentence placed immediately after the problem description, wrapping the candidate solution in explicit delimiters:
+\begin{itemize}[nosep, leftmargin=*]
+  \item \textbf{Neutral Frame (\textsc{Neutral}):} \texttt{Here is a candidate answer to the question:}
+  \item \textbf{Self-Authorship Frame (\textsc{Self}):} \texttt{You wrote the following candidate answer to the question:}
+  \item \textbf{Other-Authorship Frame (\textsc{Other}):} \texttt{Another model wrote the following candidate answer to the question:}
+\end{itemize}
+Candidate code and text solutions are encapsulated within \texttt{<candidate\_answer>...</candidate\_answer>} XML tags across all conditions.
+
+\subsection{Domain-Specific Evaluation Guidelines}
+All verification prompts include two invariant foundational instructions:
+\begin{enumerate}[nosep, leftmargin=*]
+  \item \textit{``DO NOT re-solve the problem from scratch. ONLY evaluate the candidate's existing logic.''} (This instruction ensures the verifier evaluates the provided candidate rather than generating an independent solution, which would convert verification into redundant re-generation and double inference compute, departing from standard evaluator deployments).
+  \item \textit{``Do not assume the answer is correct just because it looks plausible at a glance. Verify the logic rigorously.''}
+\end{enumerate}
+
+These are followed by domain-tailored criteria:
+\begin{itemize}[nosep, leftmargin=*]
+  \item \textbf{Code Domain (Criteria 3--5):}
+    \begin{enumerate}[resume, nosep]
+      \item Mentally dry-run the candidate's code using a simple hypothetical test case to trace its logic.
+      \item Specifically look for common pitfalls: boundary condition errors, missing imports, infinite loops, variable shadowing, and unhandled null/empty inputs.
+      \item Ensure the code strictly adheres to the prompt's constraints.
+    \end{enumerate}
+  \item \textbf{Mathematics Domain (Criteria 3--4):}
+    \begin{enumerate}[resume, nosep]
+      \item Verify the mathematical soundness of each calculation step.
+      \item Ensure the final answer is derived correctly and is stated in a single \texttt{<answer></answer>} tag.
+    \end{enumerate}
+  \item \textbf{Science Domain (Criteria 3--4):}
+    \begin{enumerate}[resume, nosep]
+      \item Verify the factual accuracy of the candidate's scientific reasoning.
+      \item Check whether the candidate stated exactly one final option (A, B, C, or D) in a \texttt{'FINAL ANSWER: <letter>'} line, and whether that option follows from its reasoning.
+    \end{enumerate}
+\end{itemize}
+
+\subsection{Strategy Output Schemas and Regex Fallback}
+\paragraph{Direct Verdict (\textsc{Direct}):}
+Evaluators output a raw JSON object containing only a boolean verdict:
+\begin{quote}
+\ttfamily \{"is\_correct": true\} \textrm{or} \{"is\_correct": false\}
+\end{quote}
+
+\paragraph{Chain-of-Thought (\textsc{CoT}):}
+Evaluators provide concise step-by-step reasoning (maximum 3--4 sentences) prior to the verdict:
+\begin{quote}
+\ttfamily \{"thinking": "<brief analysis>", "is\_correct": true/false\}
+\end{quote}
+
+\paragraph{Rubric Scoring (\textsc{Rubric}):}
+Evaluators score the candidate sequentially against each evaluation criterion as a rubric (maximum 3--4 sentences):
+\begin{quote}
+\ttfamily \{"thinking": "<criterion-by-criterion assessment>", "is\_correct": true/false\}
+\end{quote}
+
+\paragraph{Verdict Extraction and Regex Fallback Recovery:}
+Of the $64{,}800$ total API responses, $277$ ($0.43\%$) contained formatting irregularities that prevented strict JSON deserialization (predominantly unescaped LaTeX backslashes or Markdown code blocks). For these cases, a deterministic regex recovery parser searched for the canonical pattern:
+\begin{quote}
+\ttfamily r'"is\_correct"\textbackslash{}s*:\textbackslash{}s*(true|false)'
+\end{quote}
+This fallback successfully recovered valid binary verdicts from all $277$ instances, ensuring zero sample attrition across the entire experimental grid.
+
+% =========================================================================
+\section{Capability, Oversight, and Ensembling Breakdown}
+\label{app:capability}
+
+\subsection{Mathematical Formulation of Item-Adjusted Approval}
+To measure whether more capable generators produce errors that are intrinsically more difficult to detect, we must eliminate item difficulty as a confounding factor. An unadjusted false approval rate conflates error subtlety with problem hardness. 
+
+We construct the \emph{item-adjusted approval rate} by demeaning approval indicators within each problem instance. Let $a_{g, v, i} \in \{0, 1\}$ denote the binary approval verdict of verifier $v$ evaluating generator $g$'s incorrect candidate on item $i$ (where self-verification pairs $v = g$ are strictly excluded to avoid inflating apparent difficulty). Let $I_g$ denote the set of items where generator $g$ produced an incorrect solution, and let $\bar{a}_{\cdot, \cdot, i}$ denote the mean approval rate across all valid (generator, verifier) pairs on item $i$.
+
+The item-adjusted approval rate $\hat{r}_g$ for generator $g$ is formally defined as:
+\begin{equation}
+\hat{r}_g = \frac{1}{|I_g|} \sum_{i \in I_g} \left( a_{g, \cdot, i} - \bar{a}_{\cdot, \cdot, i} \right)
+\end{equation}
+Positive values indicate that generator $g$'s errors are approved more frequently than the average model's errors on the identical problem set. Confidence intervals are derived via non-parametric bootstrapping resampling problem items ($1{,}000$ iterations).
+
+\subsection{Cross-Capability Oversight Breakdown}
+We analyze whether scaling model size improves verification quality by evaluating all 18 pairs of (stronger judge, weaker judge) on the identical set of candidate errors. Table~\ref{tab:oversight-full} details the oversight win-rate matrix.
+
+\begin{table}[H]
+\centering
+\small
+\caption{Oversight matrix: Proportion of identical error candidates where a more capable verifier correctly rejected an error that a less capable verifier approved.}
+\label{tab:oversight-full}
+\begin{tabular}{llccc}
+\toprule
+\bf Stronger Judge & \bf Weaker Judge & \bf Code Domain & \bf Math Domain & \bf Science Domain \\
+\midrule
+DeepSeek-V3 (671B) & Mistral-Nemo (12B) & 54.2\% & 61.8\% & 58.4\% \\
+DeepSeek-V3 (671B) & Llama-3.3-70B      & 48.9\% & 52.3\% & 51.1\% \\
+DeepSeek-V3 (671B) & Qwen2.5-72B        & 49.5\% & 53.7\% & 50.8\% \\
+Qwen2.5-72B (72B)  & Mistral-Nemo (12B) & 56.1\% & 58.2\% & 54.6\% \\
+Llama-3.3-70B (70B)& Mistral-Nemo (12B) & 53.8\% & 55.4\% & 53.1\% \\
+Qwen2.5-72B (72B)  & Llama-3.3-70B      & 50.4\% & 51.1\% & 49.7\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+While stronger models outperform the 12B baseline (Mistral) across ungrounded domains (53.1\%--61.8\% win rate), oversight between frontier 70B-class models collapses to near chance (49.7\%--53.7\%), demonstrating that scaling within the frontier tier provides negligible error-detection advantage.
+
+\subsection{Ensemble Voting Sweep}
+Table~\ref{tab:ensemble-full} reports balanced accuracy across all majority-vote thresholds ($k$-of-$3$) using leave-one-out non-author panels.
+
+\begin{table}[H]
+\centering
+\small
+\caption{Leave-one-out ensemble voting sweep across $k$-of-$3$ non-author judges (balanced accuracy). Decision rule: candidate is approved if at least $k$ judges vote to approve ($k=3$: unanimous approval; $k=2$: majority approval; $k=1$: any approval). In ungrounded domains (math and science), ensembling fails to beat the best constituent judge on the exact same candidate subset due to shared correlated errors.}
+\label{tab:ensemble-full}
+\begin{tabular}{lccccc}
+\toprule
+\bf Domain & \bf Strategy & \bf Unanimous ($k=3$) & \bf Majority ($k=2$) & \bf Any ($k=1$) & \bf Best Single Judge \\
+\midrule
+Code    & Direct & 95.8\% & 94.2\% & 82.3\% & \bf Mistral (97.8\%) \\
+Code    & CoT    & 81.1\% & \bf 92.3\% & 78.6\% & Llama (89.9\%) \\
+Code    & Rubric & 74.8\% & \bf 90.4\% & 79.6\% & Llama (88.6\%) \\
+\midrule
+Math    & Direct & 64.8\% & 62.0\% & 56.8\% & \bf DeepSeek (65.8\%) \\
+Math    & CoT    & 64.9\% & 62.4\% & 58.8\% & \bf DeepSeek (66.7\%) \\
+Math    & Rubric & 65.9\% & 62.8\% & 57.5\% & \bf DeepSeek (68.5\%) \\
+\midrule
+Science & Direct & 63.2\% & 59.7\% & 54.6\% & \bf DeepSeek (63.3\%) \\
+Science & CoT    & 62.1\% & 60.1\% & 57.3\% & \bf DeepSeek (62.8\%) \\
+Science & Rubric & 61.8\% & 59.9\% & 58.0\% & \bf Qwen (64.0\%) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% =========================================================================
+\section{Framing Probes: Methodology and Full Breakdown}
+\label{app:framing}
+
+\subsection{Probe 1: Causal Style Transfer}
+\paragraph{Protocol:}
+The style-transfer probe isolates whether models identify their own work through stylistic prose patterns rather than reasoning paths. We selected all instances from the main grid where DeepSeek ($n = 928$) and Qwen ($n = 1{,}088$) falsely approved their own incorrect solutions. (These instances represent verification trials pooled across the 9 factorial prompting conditions for flawed candidates; clustering standard errors at the unique item level confirms that the net causal shift remains statistically indistinguishable from zero).
+
+Each candidate explanation was rewritten by an independent model, \texttt{Mixtral-8x7B-Instruct} ($T=0.3$), under two parallel conditions:
+\begin{enumerate}[nosep, leftmargin=*]
+  \item \textbf{Style-Stripped Arm:} The prose was rewritten into an abrupt, bulleted, technical register resembling Mistral's output while keeping formulas and code 100\% identical.
+  \item \textbf{Placebo Control Arm:} The prose was rewritten to match the original style and verbosity as closely as possible, controlling for text disruption caused by rewriting itself.
+\end{enumerate}
+Rewritten solutions were re-evaluated by the original verifier under identical prompts. Table~\ref{tab:style-full} presents the complete metrics.
+
+\begin{table}[H]
+\centering
+\small
+\caption{Complete Style Transfer Evaluation on Baseline False-Positive Candidates.}
+\label{tab:style-full}
+\begin{tabular}{lccccc}
+\toprule
+\bf Verifier & \bf Baseline Cases & \bf Baseline FPR & \bf Placebo FPR & \bf Style-Stripped FPR & \bf Net Causal Shift \\
+\midrule
+DeepSeek-V3 & 928   & 100.0\% & 85.45\% & 85.24\% & $-0.21$\,pp ($p = 0.93$) \\
+Qwen2.5-72B & 1,088 & 100.0\% & 91.82\% & 90.35\% & $-1.47$\,pp ($p = 0.13$) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Probe 2: Self-Recognition with Consistency Control}
+\paragraph{Protocol:}
+To test whether LLMs possess intrinsic self-recognition \citep{panickssery2024llm}, models were presented with four candidate solutions to the same problem (one generated by each study model) in randomized order and tasked with identifying which solution they generated.
+
+In naive evaluations, models appear to exhibit self-recognition (selecting their own solution at rates significantly exceeding the $25\%$ random chance baseline, particularly DeepSeek in science at $56.0\%$, $+31.0$\,pp above chance). However, we introduce a \emph{conclusion consistency control}: we evaluate whether the model selects its own output when its candidate arrived at the same conclusion as other models vs. when it reached a unique conclusion.
+
+\begin{table}[H]
+\centering
+\small
+\caption{Self-recognition accuracy before and after controlling for conclusion consistency across all four models and three domains (chance = 25.0\% raw; baseline chance $\sim 28\text{--}39\%$ for conclusion-controlled). Bonferroni significance threshold is $\alpha = 0.05/12 = 0.0042$.}
+\label{tab:self-rec-full}
+\begin{tabular}{llcccc}
+\toprule
+\bf Model & \bf Domain & \bf Raw Selection & \bf Conclusion-Controlled & \bf Baseline Chance & \bf Significance ($p$-value) \\
+\midrule
+DeepSeek-V3 & Science & 56.0\% (+31.0\,pp) & 57.1\% (+18.2\,pp) & 38.9\% & $p = 0.0001$* \\
+DeepSeek-V3 & Math    & 38.7\% (+13.7\,pp) & 35.5\% (+5.0\,pp)  & 30.5\% & $p = 0.2498$ (n.s.) \\
+DeepSeek-V3 & Code    & 24.0\% ($-1.0$\,pp)  & 22.9\% ($-7.6$\,pp)  & 30.5\% & $p = 0.0568$ (n.s.) \\
+\midrule
+Qwen2.5-72B & Science & 27.3\% (+2.3\,pp)  & 28.6\% ($-9.5$\,pp)  & 38.1\% & $p = 0.0374$ (n.s.) \\
+Qwen2.5-72B & Math    & 37.3\% (+12.3\,pp) & 38.2\% (+7.4\,pp)  & 30.8\% & $p = 0.0990$ (n.s.) \\
+Qwen2.5-72B & Code    & 30.0\% (+5.0\,pp)  & 29.9\% ($-0.6$\,pp)  & 30.5\% & $p = 0.9280$ (n.s.) \\
+\midrule
+Llama-3.3-70B & Science & 31.3\% (+6.3\,pp)  & 29.1\% ($-9.5$\,pp)  & 38.6\% & $p = 0.0400$ (n.s.) \\
+Llama-3.3-70B & Math    & 30.0\% (+5.0\,pp)  & 26.1\% ($-5.4$\,pp)  & 31.5\% & $p = 0.2609$ (n.s.) \\
+Llama-3.3-70B & Code    & 38.7\% (+13.7\,pp) & 38.7\% (+8.3\,pp)  & 30.4\% & $p = 0.0405$ (n.s.) \\
+\midrule
+Mistral-Nemo-12B & Science & 8.7\% ($-16.3$\,pp) & 11.8\% ($-27.1$\,pp) & 38.9\% & $p = 0.0000$ (below chance) \\
+Mistral-Nemo-12B & Math    & 14.7\% ($-10.3$\,pp) & 13.5\% ($-14.3$\,pp) & 27.8\% & $p = 0.0059$ (n.s.) \\
+Mistral-Nemo-12B & Code    & 19.3\% ($-5.7$\,pp)  & 16.8\% ($-13.1$\,pp) & 29.9\% & $p = 0.0013$ (below chance) \\
+\bottomrule
+\end{tabular}
+\end{table}
+Across 9 of 12 model$\times$domain cells, apparent self-recognition collapses to chance once conclusion agreement is held constant, while Mistral significantly avoids its own candidates in science and code ($p < 0.0042$). Only DeepSeek in science retains above-chance recognition ($57.1\%$ vs $38.9\%$, $p = 0.0001 < 0.0042$).
+
+\subsection{Probe 3: Structural Self-Preference on Mutually Wrong Candidates}
+\paragraph{Protocol:}
+We identified 608 problems across all three domains where both DeepSeek-V3 and Qwen2.5-72B generated incorrect solutions, and both falsely approved their own solutions during verification. Each model was presented with both flawed solutions side-by-side (labeled Candidate A and Candidate B) and asked to judge which algorithmic approach was structurally superior.
+
+To control for presentation order bias, each pair was evaluated twice per model with order inverted (A/B and B/A), yielding $1{,}216$ evaluations per model. Table~\ref{tab:struct-full} records the full domain breakdown.
+
+\begin{table}[H]
+\centering
+\small
+\caption{Structural Self-Preference on shared incorrect candidate pairs ($n = 608$ total; $54$ code, $333$ math, $221$ science). Rows sum to 100\% across mutually exclusive outcomes.}
+\label{tab:struct-full}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{llcccccc}
+\toprule
+\bf Model & \bf Domain & \bf Picked Own & \bf Picked Other & \bf Both Correct & \bf Both Incorrect & \bf Position Bias & \bf Inconsistent \\
+\midrule
+DeepSeek-V3 & Code (54)    & 16.7\% (9)  & 14.8\% (8)  & 35.2\% (19)  & 0.0\% (0)   & 9.3\% (5)   & 24.1\% (13) \\
+DeepSeek-V3 & Math (333)   & 6.0\% (20)  & 3.0\% (10)  & 77.8\% (259) & 0.3\% (1)   & 4.5\% (15)  & 8.4\% (28)  \\
+DeepSeek-V3 & Science (221)& 5.0\% (11)  & 1.4\% (3)   & 57.9\% (128) & 13.6\% (30) & 0.9\% (2)   & 21.3\% (47) \\
+\midrule
+Qwen2.5-72B & Code (54)    & 37.0\% (20) & 11.1\% (6)  & 20.4\% (11)  & 0.0\% (0)   & 22.2\% (12) & 9.3\% (5)   \\
+Qwen2.5-72B & Math (333)   & 10.2\% (34) & 2.7\% (9)   & 70.9\% (236) & 0.0\% (0)   & 6.3\% (21)  & 9.9\% (33)  \\
+Qwen2.5-72B & Science (221)& 10.4\% (23) & 13.1\% (29) & 41.6\% (92)  & 0.5\% (1)   & 14.9\% (33) & 19.5\% (43) \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+% =========================================================================
+\section{Multi-Agent Deliberation Juries: Protocols and Dynamics}
+\label{app:jury}
+
+\subsection{Architectural Specifications}
+To rigorously test whether deliberative agent architectures can substitute for execution grounding, we benchmarked two distinct multi-agent paradigms on DeepSeek-V3's 150 HumanEval+ code solutions (the hardest generator pool):
+
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{Team A: Parallel Debate Jury (Unconstrained Deliberation)}
+    \begin{itemize}[nosep]
+      \item \textit{Panelists:} \texttt{Step-3.7-Flash}, \texttt{Nemotron-4-340B}, and \texttt{Kimi-K2.7-Code}.
+      \item \textit{Protocol:} 3 iterative debate rounds. In Round 1, each model independently analyzes the code. In Rounds 2 and 3, all prior analyses are shared anonymously, and models critique and rebut peer assessments. In the final stage, an impartial judge synthesizes the transcript into a binding verdict.
+    \end{itemize}
+  \item \textbf{Team B: Sequential Role Pipeline (Structured Specialization)}
+    \begin{itemize}[nosep]
+      \item \textit{Stage 1 (Correctness):} \texttt{Nemotron-4-340B} performs formal step-by-step logic tracing.
+      \item \textit{Stage 2 (Red Teaming):} \texttt{Kimi-K2.7-Code} attacks the code, proposing edge cases and boundary failures.
+      \item \textit{Stage 3 (Fidelity Arbiter):} \texttt{Step-3.7-Flash} audits the critique against problem constraints, filtering pedantic false alarms before issuing the verdict.
+    \end{itemize}
+\end{enumerate}
+
+\subsection{Resource Consumption and Efficiency Analysis}
+Table~\ref{tab:jury-cost-full} details the computational overhead and token footprint across architectures on the identical 150 code problems.
+
+\begin{table}[H]
+\centering
+\small
+\caption{Comprehensive compute and cost analysis across deliberation architectures vs.\ single grounded judge ($n = 150$).}
+\label{tab:jury-cost-full}
+\begin{tabular}{lcccc}
+\toprule
+\bf Metric & \bf Team A: Parallel Debate & \bf Team B: Sequential Pipeline & \bf Grounded Baseline (Qwen 72B) \\
+\midrule
+Mean Tokens per Item   & 21,039 & 5,438 & 653 \\
+Total Token Footprint  & 3.16M  & 815K  & 98K \\
+Total Compute Cost     & \$13.71 & \$0.84 & \$0.03 \\
+Cost Multiplier vs.\ Baseline & \bf 457$\times$ & \bf 28$\times$ & \bf 1$\times$ \\
+Error Catch Rate (TNR) & 76.67\% & 70.00\% & \bf 93.33\% \\
+Balanced Accuracy      & 86.67\% & 81.67\% & \bf 96.25\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Qualitative Analysis: Adversarial Infection Case Studies}
+The transcript logs reveal why ungrounded debate underperforms. Without an empirical execution signal, unconstrained multi-agent debate is vulnerable to \emph{adversarial infection}:
+\begin{itemize}[nosep, leftmargin=*]
+  \item On item \texttt{code\_HumanEval\_11} (string XOR), the candidate code was functionally correct. In Round 2, one panelist conjectured that the candidate might encounter memory overflow on strings exceeding $10^9$ characters (a condition absent from problem constraints). The remaining panelists conceded to this critique in Round 3, resulting in an unjustified false rejection.
+  \item On item \texttt{code\_HumanEval\_145}, the candidate contained a subtle negative integer sorting bug. Team A's panelists spent all three rounds debating stylistic variable naming choices, ultimately overlooking the bug and voting that the code was correct.
+\end{itemize}
+In contrast, the single execution-grounded verifier received runtime assertion feedback, correctly evaluating both problems in a single forward pass ($<1$ second).
+
+% =========================================================================
+\section{Model Identifiers, Serving Infrastructure, and Reproducibility}
+\label{app:models}
+
+Table~\ref{tab:model-ids} lists the exact model identifiers, parameter counts, serving providers, and evaluation roles for all models used across our study. All models were queried via hosted inference APIs under deterministic decoding ($\text{temperature} = 0.0$, top\_p $= 1.0$) unless explicitly noted otherwise.
+
+\begin{table}[H]
+\centering
+\small
+\caption{Model identifiers, parameter scales, serving providers, and evaluation roles.}
+\label{tab:model-ids}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lllcl}
+\toprule
+\bf Model Display Name & \bf Provider Model String & \bf Provider & \bf Parameters & \bf Role in Study \\
+\midrule
+DeepSeek-V3 & \texttt{deepseek-ai/DeepSeek-V3} & DeepInfra & 671B (37B active) & Generator, Verifier, Probe Judge \\
+Qwen2.5-72B-Instruct & \texttt{Qwen/Qwen2.5-72B-Instruct} & DeepInfra & 72B & Generator, Verifier, Probe Judge \\
+Llama-3.3-70B-Instruct-Turbo & \texttt{meta-llama/Llama-3.3-70B-Instruct-Turbo} & DeepInfra & 70B & Generator, Verifier \\
+Mistral-Nemo-Instruct-2407 & \texttt{mistralai/Mistral-Nemo-Instruct-2407} & DeepInfra & 12.2B & Generator, Verifier \\
+\midrule
+Mixtral-8x7B-Instruct & \texttt{mistralai/Mixtral-8x7B-Instruct-v0.1} & DeepInfra & 46.7B (12.9B active) & Style Transfer Rewriter ($T=0.3$) \\
+Gemma-2-27B-IT & \texttt{google/gemma-2-27b-it} & DeepInfra & 27B & Differential Fuzz Input Generator ($T=0.7$) \\
+WizardLM-2-8x22B & \texttt{microsoft/WizardLM-2-8x22B} & DeepInfra & 141B (39B active) & Override Oracle Adjudicator ($T=0.0$) \\
+\midrule
+Step 3.7 Flash & \texttt{stepfun/step-3.7-flash} & OpenRouter & Proprietary & Deliberation Jury Panelist \\
+Nemotron-4-340B-Instruct & \texttt{nvidia/nemotron-4-340b-instruct} & DeepInfra & 340B & Deliberation Jury Panelist \\
+Kimi K2.7 Code & \texttt{moonshotai/kimi-k2.7-code} & OpenRouter & Proprietary & Deliberation Jury Panelist \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+All experimental execution harnesses, differential fuzzing pipelines, evaluation logs, and analysis scripts are deposited in an anonymized repository: \url{https://anonymous.4open.science/r/JUDGe-who-verifies-agents-6A34/}.
