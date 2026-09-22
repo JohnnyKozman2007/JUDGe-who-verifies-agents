@@ -1,19 +1,4 @@
 \section{Conclusion}
 \label{sec:conclusion}
 
-Agreement is not verification. Across 64{,}800 verifications, judges without an environment
-signal fail together rather than independently, a stronger generator's errors are
-correspondingly harder for any of them to catch, and no verification strategy closes the
-gap, so larger panels and better prompting do not deliver what they promise. Blinding judges
-to authorship misses as well: models are nearly indifferent to the \emph{told} frame, varying
-by under one percentage point, yet approve their own errors 11.9 points more often when they
-truly wrote them. That gap survives a placebo-controlled style transfer and dissolves under a
-consistency control, so what persists is the conclusion a model still holds, not recognition
-of its own prose.
-
-Reliable verification therefore requires the environment. It does not require blind trust in
-the judge reading it: verifiers that override a passing test suite are unjustified in 77.2\%
-of cases and confirmed in only 7.3\%. The two findings point the same way. A judge left alone
-with its own reasoning defends it, and a judge handed a signal it is free to ignore will
-sometimes ignore it. What raises reliability is not a better reader but a checkable
-environment, and a judge aligned to defer to it.
+Agreement is not verification. Across $64{,}800$ evaluations, ungrounded judges share correlated blind spots, miss errors from stronger generators, and exhibit an 11.9\,pp self-preference gap driven by belief persistence rather than prompt framing or recognition. Model-side fixes—blinding, scaling, voting, and debate—cannot overcome flawed generative priors. Environmental execution grounding uniquely restores reliability, decorrelating verifier errors and achieving a 93.3\% catch rate. Ultimately, reliable verification depends on ground-truth environment signals, not more persuasive readers.
