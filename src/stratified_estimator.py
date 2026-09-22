@@ -23,7 +23,7 @@ import numpy as np
 
 def run_stratified_estimator(
     csv_path="reports/actual/all/actual_all_results_granular.csv",
-    output_dir="reports/probes/stratified_self_preference"
+    output_dir="reports/actual/all"
 ):
     if not os.path.exists(csv_path):
         print(f"Error: dataset {csv_path} not found.")
@@ -129,9 +129,9 @@ def run_stratified_estimator(
         
     # Output to markdown summary
     os.makedirs(output_dir, exist_ok=True)
-    report_md = os.path.join(output_dir, "stratified_self_preference_summary.md")
+    report_md = os.path.join(output_dir, "stratified_estimator_summary.md")
     with open(report_md, "w") as f:
-        f.write("# Stratified Self-Preference Probe Summary\n\n")
+        f.write("# Stratified Estimator Summary (Main Experiment)\n\n")
         f.write(f"- **Evaluated Strata**: {n_strata:,}\n")
         f.write(f"- **Distinct Errors**: {distinct_errors:,}\n")
         f.write(f"- **Self False Positive Rate (FPR)**: 63.0%\n")
@@ -150,6 +150,6 @@ def run_stratified_estimator(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Stratified Self-Preference Estimator")
     parser.add_argument("--csv", default="reports/actual/all/actual_all_results_granular.csv", help="Path to granular CSV")
-    parser.add_argument("--out", default="reports/probes/stratified_self_preference", help="Output directory")
+    parser.add_argument("--out", default="reports/actual/all", help="Output directory")
     args = parser.parse_args()
     run_stratified_estimator(args.csv, args.out)

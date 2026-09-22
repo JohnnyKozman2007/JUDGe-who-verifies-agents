@@ -1,4 +1,4 @@
-# Stratified Self-Preference Probe Summary
+# Stratified Estimator Summary (Main Experiment)
 
 - **Evaluated Strata**: 6,969
 - **Distinct Errors**: 779
