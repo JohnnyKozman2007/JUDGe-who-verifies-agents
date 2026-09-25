@@ -1,233 +1,192 @@
 # JUDGe — *Who Verifies the Verifiers?*
 
-A research pipeline measuring **LLM verifier bias and accuracy** across three domains: code, mathematics, and PhD-level science. The pipeline asks: when LLMs are used as judges of other LLMs' outputs, how accurate are they — and do they behave differently when told the answer they are reviewing is their own?
+A research pipeline and empirical study investigating **LLM verifier reliability, belief persistence, and evaluation biases** across code, mathematics, and PhD-level science. 
+
+When LLMs act as automated judges ("LLM-as-judge") to verify the correctness of agent outputs, they suffer from a severe **specificity collapse**: while they reliably approve correct answers (87.9% True Positive Rate), they fail to catch errors (catching only 46.1% overall, and plunging to 26.4% in math). Furthermore, verifiers exhibit an **11.9 percentage point self-preference gap** when evaluating their own mistakes. Our findings show that prompt anonymization, model scaling, and multi-agent debate juries fail to restore reliability; only **environmental execution grounding** decorrelates judge errors and restores verifier integrity (achieving a 93.3% catch rate).
 
 ---
 
-## Research Questions
+## 📌 Paper Navigation & Project History
 
-As AI systems become more agentic, LLMs are increasingly used to verify the correctness of other AI-generated outputs ("LLM-as-judge"). This project investigates:
+This repository contains materials for both the original exploratory workshop paper and the expanded full-conference submission:
 
-1. **How accurate** are LLM verifiers across code, math, and science domains?
-2. **Are they biased by authorship framing?** Do they approve their own mistakes at higher rates (self-preservation bias) or reject their own correct answers (self-doubt bias)?
-3. **Does verification strategy matter?** Direct judgment vs. chain-of-thought vs. rubric-style evaluation.
-4. **Does the told frame vs. actual authorship matter differently?** The *belief effect* (told "you wrote it") is disentangled from the *reality effect* (actually wrote it).
+### 1. New Paper (Full Conference Submission — ICLR 2027)
+- **Title**: *What Actually Fixes an LLM Verifier — And Why Nothing Else Does*
+- **Track**: ICLR 2027 Conference Submission (9-page main text, double-blind review).
+- **Directory to read**: [`ICLR/`](ICLR/)
+  - Main manuscript: [`ICLR/paper.tex`](ICLR/paper.tex)
+  - Modular sections: [`ICLR/sections/`](ICLR/sections/) (`00_abstract.tex` through `07_reproducibility.tex`, and `appendix.tex`)
+  - Figures and plots: [`ICLR/figures/`](ICLR/figures/)
+- **Anonymous Review Repository**: [https://anonymous.4open.science/r/JUDGe-who-verifies-agents-6A34/](https://anonymous.4open.science/r/JUDGe-who-verifies-agents-6A34/)
+- **Key Contributions**:
+  - **Full Factorial Scale**: 64,800 verification evaluations across 4 models, 3 domains, 3 ownership frames, and 3 verification strategies.
+  - **The Mechanism (Belief Persistence vs. Prompt Framing)**: Disentangled using 5 targeted diagnostic probes. Telling a model "you wrote this" shifts accuracy by $<1$\thinspace{}pp (ruling out prompt sycophancy), whereas holding the identical error constant across 6,969 matched strata (779 unique errors) reveals an **11.9\,pp self-preference gap** ($95\%$ CI $[+10.4, +13.5]$) driven by shared generative blind spots.
+  - **Why Multi-Agent Juries Fail**: Ungrounded debate juries catch only 76.7% of errors despite massive compute inflation because judges share correlated reasoning errors on incorrect candidates.
+  - **Execution Grounding**: Environmental feedback emerges as the only tested intervention that decisively breaks specificity collapse, achieving a 93.3% error catch rate.
+
+### 2. Old Paper (Workshop Submission — NeurIPS 2026)
+- **Title**: *Neither Blinding Nor a Jury, Neither Capability Nor Strategy: What Brings a Verifier to Reliability*
+- **Workshop**: Submitted to the **NeurIPS 2026 Workshop on "Who Verifies the Agents? Toward Reliable Agent Development"** (`[dblblindworkshop]{neurips_2026}`).
+- **Authors**: Arushi Waddepalli (IIIT Lucknow), Johnny Kozman (University of Hertfordshire), Tilak Parajuli (Tribhuvan University).
+- **Directory to read**: [`paper/`](paper/)
+  - Workshop manuscript: [`paper/paper.tex`](paper/paper.tex)
+  - Style files: [`paper/neurips_2026.sty`](paper/neurips_2026.sty)
+- **Scope**: Initial exploratory analysis investigating prompt blinding, rubrics, and the limitations of multi-agent voting juries.
 
 ---
 
-## Pipeline Architecture
+## 📂 Repository Structure & Guide to Files
 
 ```
-run.py
- ├─ Step 1: data_loader.py        → Fetches MATH / HumanEval+ / GPQA Diamond from HuggingFace
- ├─ Step 2: generate.py           → 4 models generate candidate answers
- ├─ Step 3: verify.py             → 4 verifiers × 3 frames × 3 strategies evaluate every candidate
- ├─ Step 4: validate_overrides.py → Fuzzes code disagreements; logs missed failures
- └─ (manual) report.py            → Produces CSVs, plots, executive summary
+.
+├── ICLR/                         # [NEW] Full Conference Paper (ICLR 2027)
+│   ├── paper.tex                 # Main LaTeX driver
+│   ├── sections/                 # Paper sections (00_abstract to 07_reproducibility)
+│   ├── figures/                  # Publication figures
+│   └── iclr2027_conference.sty   # ICLR style template
+│
+├── paper/                        # [OLD] Workshop Paper (NeurIPS 2026 Workshop)
+│   ├── paper.tex                 # Workshop LaTeX source
+│   └── neurips_2026.sty          # NeurIPS workshop style template
+│
+├── src/                          # Core experimental pipeline and analysis
+│   ├── stratified_estimator.py   # [CRITICAL] Reproducible stratified estimator script
+│   │                             # (computes the +11.9 pp self-preference gap,
+│   │                             # 6,969 strata, 779 errors, and 95% CI)
+│   ├── run.py                    # Pipeline orchestrator (Steps 1–4)
+│   ├── data_loader.py            # HuggingFace benchmark ingestion
+│   ├── generate.py               # Candidate answer generation across 4 models
+│   ├── verify.py                 # Core verifier execution (144 runs/item)
+│   ├── validate_overrides.py     # Code domain fuzzing audit coordinator
+│   ├── fuzz_validate.py          # Differential fuzzer + LLM oracle arbitration
+│   ├── execution_grounding.py    # Subprocess execution sandbox & traceback capture
+│   ├── report.py                 # Metric compilation, balanced accuracy, and CSV tables
+│   ├── prompts.py                # Evaluation prompt templates
+│   ├── science_utils.py          # GPQA 5-tier answer parser
+│   ├── code_utils.py             # Code cleaning and execution utilities
+│   ├── models.py                 # API clients and model registry
+│   │
+│   └── probes/                   # Diagnostic probe scripts
+│       ├── analysis_self_recognition.py # Self-recognition probe analysis
+│       ├── run_self_preference_probe.py # Preference probe harness
+│       ├── run_style_transfer.py        # Style transfer probe harness
+│       ├── jury_probe_code.py           # Multi-agent debate jury evaluation
+│       └── analysis_ensemble.py         # Scaling & ensemble voting analysis
+│
+├── data/                         # Experimental traces and artifacts
+│   ├── raw/                      # Ingested benchmark items (HumanEval+, MATH, GPQA)
+│   ├── generated/                # Candidate answers from 4 generator models
+│   ├── verified/                 # 64,800 verification decision records
+│   └── validated/                # Differential fuzzing results on code overrides
+│
+├── reports/                      # Generated CSV summary reports and tables
+│   ├── all/                      # Cross-domain aggregations and stratified statistics
+│   ├── code/                     # Code domain performance tables
+│   ├── math/                     # Math domain performance tables
+│   └── science/                  # Science domain performance tables
+│
+└── plots/                        # Generated figures and confusion matrices
 ```
-
-**Data directories:**
-- `data/raw/` — benchmark items (question, ground truth, test harness)
-- `data/generated/` — candidate answers from each of the 4 models
-- `data/verified/` — verifier verdicts for each of the 144 combinations per item
-- `data/validated/` — fuzz results for code domain disagreements
-- `reports/` — CSV reports + executive summary markdown
-- `plots/` — confusion matrices and bias plots
 
 ---
 
-## Experimental Design
+## 🧪 Experimental Design & Setup
 
 ### Models Evaluated (4)
+| Model Short Name | Identifier | Architecture | Role |
+|---|---|---|---|
+| `qwen` | `Qwen/Qwen2.5-72B-Instruct` | 72B Dense | Generator & Verifier |
+| `deepseek` | `deepseek-ai/DeepSeek-V3` | 671B MoE | Generator & Verifier |
+| `llama` | `meta-llama/Llama-3.3-70B-Instruct-Turbo` | 70B Dense | Generator & Verifier |
+| `mistral` | `mistralai/Mistral-Nemo-Instruct-2407` | 12B Dense | Generator & Verifier |
 
-| Short Name | Model ID | Size |
-|---|---|---|
-| `qwen` | `Qwen/Qwen2.5-72B-Instruct` | 72B |
-| `deepseek` | `deepseek-ai/DeepSeek-V3` | ~671B MoE |
-| `llama` | `meta-llama/Llama-3.3-70B-Instruct-Turbo` | 70B |
-| `mistral` | `mistralai/Mistral-Nemo-Instruct-2407` | 12B |
-
-> ⚠️ **Known limitation:** Mistral-Nemo at 12B is substantially smaller than the others. Observed differences in verifier accuracy may reflect capacity, not purely bias.
-
-### Ownership Frames (3)
-
-| Frame | Prompt Says |
-|---|---|
-| `self` | "You wrote the following candidate answer..." |
-| `other` | "Another model wrote the following candidate answer..." |
-| `neutral` | "Here is a candidate answer..." |
-
-> ℹ️ The "self" frame measures a **framing effect** — does the attribution phrase "you wrote this" change LLM judgment? LLMs have no persistent memory, so this does not test true self-recognition. It tests how authorship attribution in the prompt context influences evaluation behavior.
-
-### Verification Strategies (3)
-
-| Strategy | Description |
-|---|---|
-| `direct` | Verdict only — no visible reasoning |
-| `cot` | Brief chain-of-thought (max 3–4 sentences) + verdict |
-| `rubric` | Rubric-scored evaluation + verdict |
-
-### Scale
-
-- **Pilot mode**: 10 items per domain
-- **Actual mode**: 150 items per domain
-- **Verifications per item**: 4 models × 4 models × 3 frames × 3 strategies = **144 verifications**
-- **Total (actual, all domains)**: 150 × 3 × 144 = **64,800 verification calls**
+### Factorial Evaluation Matrix
+- **3 Domains**: Code ([HumanEval+](https://github.com/evalplus/evalplus)), Mathematics ([MATH](https://github.com/hendrycks/math)), Science ([GPQA Diamond](https://github.com/idavidrein/gpqa)).
+- **Scale**: 150 items per domain $\times$ 4 generators $\times$ 4 verifiers $\times$ 3 frames $\times$ 3 strategies = **64,800 verification calls**.
+- **3 Ownership Frames**:
+  - `self`: *"You wrote the following candidate answer..."*
+  - `other`: *"Another model wrote the following candidate answer..."*
+  - `neutral`: *"Here is a candidate answer..."*
+- **3 Verification Strategies**:
+  - `direct`: Verdict only.
+  - `cot`: Chain-of-thought rationale + verdict.
+  - `rubric`: Rubric criteria scoring + verdict.
 
 ---
 
-## Domains & Ground Truth
+## 🚀 Reproduction & Execution
 
-### Code (HumanEval+)
-Ground truth is established by **executing** the candidate's code against an official test harness. The verifier also receives an execution result block (stdout, exit code, traceback if any) before judging, grounding it in actual runtime behavior rather than code reading — addressing the ~70–90% false-positive rate from "fluent-looking but broken" code.
-
-### Mathematics (MATH dataset)
-Ground truth is established by extracting the LaTeX `\boxed{}` answer and performing numeric/exact-string matching. The extraction uses a brace-matched parser that handles nested LaTeX correctly.
-
-### Science (GPQA Diamond)
-Ground truth is a multiple-choice letter (A–D). The candidate's answer is extracted via a 5-tier parser (strict final-answer line → explicit statement → last-line fallback → option-text match → low-confidence tail). An ambiguous parse is always graded as incorrect.
-
----
-
-## Code Domain Safeguards
-
-### Differential Fuzzing (`fuzz_validate.py`)
-
-When the verifier overrides a clean test pass (execution passed, verifier said incorrect), the pipeline runs a **differential fuzzer**:
-
-1. `google/gemma-2-27b-it` (external to the 4 study models) generates 15 adversarial test inputs.
-2. Both the candidate code and the ground-truth reference run on each input in isolated subprocesses with a 2-second timeout.
-3. If outputs differ, `microsoft/WizardLM-2-8x22B` acts as an oracle to determine which implementation was correct.
-
-**Possible verdicts:**
-
-| Verdict | Meaning |
-|---|---|
-| `BUG_CONFIRMED` | Oracle confirmed the candidate has a real bug the verifier correctly caught |
-| `REFERENCE_BUG` | Oracle says the ground-truth reference is wrong (benchmark data quality issue) |
-| `NO_DISCREPANCY` | All 15 inputs produced identical outputs — verifier override looks like a false alarm |
-| `SKIPPED_PIPELINE_FAIL` | Input generation, execution, or oracle failed; falls back to raw test result |
-
-### Execution Grounding (`execution_grounding.py`)
-The verifier receives a real execution result block before judging — stdout, exit code, and the last traceback frame if it crashed. This converts the task from "read and guess" to "explain why this execution outcome is correct or incorrect."
-
----
-
-## Metrics Reported
-
-| Metric | Formula | Notes |
-|---|---|---|
-| Accuracy | `(TP + TN) / Valid_Total` | Excludes formatting failures |
-| Adjusted Accuracy | Same with fuzz-adjusted ground truth | Code domain only |
-| FPR | `FP / (FP + TN)` | Self-Preservation Bias when split by frame |
-| FNR | `FN / (FN + TP)` | Self-Doubt Bias when split by frame |
-| FPR Self-Bias | `FPR(self) − FPR(other)` | Positive = more lenient on own mistakes |
-| FNR Self-Bias | `FNR(self) − FNR(other)` | Positive = harsher on own correct answers |
-| Dissociation Rate | % where reasoning contradicts verdict | cot/rubric strategies only |
-
-Statistical significance is tested via chi-square per (verifier, domain, strategy) cell.
-
-The **Belief vs. Reality** table crosses told frame against actual authorship to disentangle whether it is *being told* "you wrote it" or *actually having written it* that drives bias.
-
----
-
-## Setup & Reproduction
-
-### Prerequisites
+### 1. Environment Setup
 ```bash
 python -m venv venv
-venv\Scripts\activate          # Windows
-# source venv/bin/activate     # Linux/macOS
+# Windows:
+venv\Scripts\activate
+# Linux/macOS:
+source venv/bin/activate
+
 pip install -r requirements.txt
 ```
 
-### Configuration
-Copy `.env.example` to `.env`:
-```
-DEEPINFRA_API_KEY=your_key_here
+### 2. Configuration
+Copy `.env.example` to `.env` and configure your API keys:
+```bash
+cp .env.example .env
+# Edit .env with your DEEPINFRA_API_KEY
 ```
 
-### Preflight Check
+### 3. Verify System Health
 ```bash
 python preflight_check.py
 ```
 
-### Run the Pipeline
+### 4. Running the Stratified Self-Preference Estimator
+To reproduce the paper's headline $+11.9$\,pp self-preference gap, 6,969 strata, 779 unique errors, and 95% confidence interval:
+```bash
+python src/stratified_estimator.py
+```
+
+### 5. Running the Pipeline
 ```bash
 # Pilot run (10 items/domain)
 python run.py --mode pilot --domain all
 
-# Full run (150 items/domain)
+# Full run (150 items/domain, 64,800 evaluations)
 python run.py --mode actual --domain all
 
-# Single domain
-python run.py --mode pilot --domain code
-```
-
-### Generate Reports (manual, after pipeline completes)
-```bash
-python src/report.py --mode pilot --domains all
+# Generate all CSV reports and summary statistics
+python src/report.py --mode actual --domains all
 ```
 
 ---
 
-## Known Issues & Limitations
+## 🔍 Methodological Scope & Clarifications
 
-**Critical crash bug** — `validate_overrides.py` uses the variable `overwrite` inside `process_domain()` but it is not a parameter of that function. This raises a `NameError` on any run where output files already exist. Fix: add `overwrite=False` as a parameter to `process_domain()` and thread it through from `main()`.
-
-**`NEITHER` oracle verdict → `BUG_CONFIRMED`** — When the oracle cannot determine which implementation is correct (e.g., both crash on a malformed input), the pipeline defaults to penalizing the candidate. This is logically incorrect and inflates apparent bug rates.
-
-**Oracle is itself an LLM** — `_ask_oracle` uses `WizardLM-2-8x22B` to adjudicate correctness disputes. Since the paper studies LLM judgment quality, relying on an unevaluated LLM to establish ground truth creates a circular dependency. Oracle verdicts are soft signals, not gold-standard ground truth.
-
-**15 fuzzing inputs is not empirically justified** — The paper should quantify how many inputs are needed for meaningful bug-detection power on HumanEval+. `NO_DISCREPANCY` may mean "fuzzer didn't find it in 15 tries," not "there is no bug."
-
-**Dissociation detection is asymmetric** — The detection condition is more permissive for "verdict says correct, reasoning says incorrect" than for the reverse. Results are not symmetric across verdict directions.
-
-**Mistral-12B capacity gap** — Mistral-Nemo at 12B is 6× smaller than the other study models. Apparent accuracy and bias differences may be capacity-driven rather than behavior-driven.
-
-**"Self" frame measures framing, not memory** — The pipeline measures whether the attribution phrase "you wrote this" changes LLM behavior, not whether the LLM recognizes its own output. The paper should be explicit about this distinction.
+1. **Stratified Error Matching**: Self-preference is computed by holding the exact erroneous text constant across 6,969 matched evaluator strata spanning 779 distinct error outputs, isolating generator identity from item difficulty and text variance.
+2. **Differential Fuzzing Audit**: In the code domain, overrides of passing test harnesses are audited using differential fuzzing (`fuzz_validate.py`) with 15 adversarial inputs generated by `gemma-2-27b-it`. For disagreements, `WizardLM-2-8x22B` serves as an oracle. When the oracle returns `NEITHER` (cannot resolve ambiguity), the system falls back to test-harness truth (`SKIPPED_PIPELINE_FAIL`) without penalizing the candidate.
+3. **Execution Grounding**: Code verifiers receive real runtime execution traces (stdout, exit codes, tracebacks), transforming evaluation from speculative reading to behavioral verification.
+4. **Capacity Controls**: Analysis accounts for model parameter scaling, noting that Mistral-12B behaves primarily as an uncritical rubber-stamp compared to frontier 70B/671B models.
 
 ---
 
-## Project Structure
+## 📄 Citation
 
-```
-.
-├── run.py                        # Pipeline orchestrator (Steps 1–4)
-├── preflight_check.py            # API and model health check
-├── requirements.txt
-├── .env.example                  # Template for API key configuration
-│
-├── src/
-│   ├── data_loader.py            # HuggingFace dataset fetching
-│   ├── generate.py               # Candidate answer generation
-│   ├── verify.py                 # Verifier LLM calls + JSON parsing
-│   ├── validate_overrides.py     # Code domain: fuzz + missed-failure logging
-│   ├── fuzz_validate.py          # Differential fuzzer + LLM oracle
-│   ├── execution_grounding.py    # Subprocess code execution engine
-│   ├── report.py                 # Post-hoc analysis, CSV, plots, summary
-│   ├── prompts.py                # All prompt templates
-│   ├── science_utils.py          # GPQA answer extraction and grading
-│   ├── code_utils.py             # Code fence stripping utilities
-│   └── models.py                 # DeepInfra API client + model registry
-│
-├── data/
-│   ├── raw/                      # Benchmark items (ground truth, test harnesses)
-│   ├── generated/                # Candidate answers from 4 models
-│   ├── verified/                 # Verifier judgments (144 per item)
-│   └── validated/                # Fuzz results for code overrides
-│
-├── reports/                      # CSV outputs from report.py
-├── plots/                        # PNG charts from report.py
-└── paper/                        # Paper drafts
+For the full conference paper:
+```bibtex
+@inproceedings{judge2027fixes,
+  title={What Actually Fixes an LLM Verifier --- And Why Nothing Else Does},
+  author={Anonymous},
+  booktitle={International Conference on Learning Representations (ICLR)},
+  year={2027},
+  note={Under review}
+}
 ```
 
----
-
-## Citation
-
-*(Add citation here when paper is published.)*
-
-## License
-
-*(Add license here.)*
+For the earlier workshop exploratory paper:
+```bibtex
+@inproceedings{waddepalli2026neither,
+  title={Neither Blinding Nor a Jury, Neither Capability Nor Strategy: What Brings a Verifier to Reliability},
+  author={Waddepalli, Arushi and Kozman, Johnny and Parajuli, Tilak},
+  booktitle={NeurIPS 2026 Workshop on Who Verifies the Agents? Toward Reliable Agent Development},
+  year={2026}
+}
+```
