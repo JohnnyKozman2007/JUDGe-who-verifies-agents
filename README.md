@@ -1,4 +1,4 @@
-# JUDGe — *Who Verifies the Verifiers?*
+# What Actually Fixes an LLM Verifier — And Why Nothing Else Does
 
 A research pipeline and empirical study investigating **LLM verifier reliability, belief persistence, and evaluation biases** across code, mathematics, and PhD-level science. 
 
@@ -27,7 +27,7 @@ This repository contains materials for both the original exploratory workshop pa
 ### 2. Old Paper (Workshop Submission — NeurIPS 2026)
 - **Title**: *Neither Blinding Nor a Jury, Neither Capability Nor Strategy: What Brings a Verifier to Reliability*
 - **Workshop**: Submitted to the **NeurIPS 2026 Workshop on "Who Verifies the Agents? Toward Reliable Agent Development"** (`[dblblindworkshop]{neurips_2026}`).
-- **Authors**: Arushi Waddepalli (IIIT Lucknow), Johnny Kozman (University of Hertfordshire), Tilak Parajuli (Tribhuvan University).
+- **Authors**: *Omitted for double-blind review*
 - **Directory to read**: [`paper/`](paper/)
   - Workshop manuscript: [`paper/paper.tex`](paper/paper.tex)
   - Style files: [`paper/neurips_2026.sty`](paper/neurips_2026.sty)
@@ -170,23 +170,4 @@ python src/report.py --mode actual --domains all
 
 ## 📄 Citation
 
-For the full conference paper:
-```bibtex
-@inproceedings{judge2027fixes,
-  title={What Actually Fixes an LLM Verifier --- And Why Nothing Else Does},
-  author={Anonymous},
-  booktitle={International Conference on Learning Representations (ICLR)},
-  year={2027},
-  note={Under review}
-}
-```
-
-For the earlier workshop exploratory paper:
-```bibtex
-@inproceedings{waddepalli2026neither,
-  title={Neither Blinding Nor a Jury, Neither Capability Nor Strategy: What Brings a Verifier to Reliability},
-  author={Waddepalli, Arushi and Kozman, Johnny and Parajuli, Tilak},
-  booktitle={NeurIPS 2026 Workshop on Who Verifies the Agents? Toward Reliable Agent Development},
-  year={2026}
-}
-```
+*(Citation will be added upon acceptance / publication.)*
