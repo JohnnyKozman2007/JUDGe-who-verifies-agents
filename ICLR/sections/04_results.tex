@@ -13,7 +13,8 @@ Across all $64{,}800$ verifications, model accuracy averages $69.7\%$ ($66.9\%$ 
 
 \begin{table}[t]
 \centering
-\small
+\footnotesize
+\renewcommand{\arraystretch}{0.92}
 \caption{Best-performing (verifier, frame, strategy) combination per domain.}
 \label{tab:best-combo}
 \begin{tabular}{lllllccc}
@@ -43,7 +44,8 @@ The most prominent failure in the landscape is self-preference. However, when we
 
 \begin{table}[t]
 \centering
-\small
+\footnotesize
+\renewcommand{\arraystretch}{0.92}
 \caption{Belief vs.\ reality with told frame held at ``\textsc{self}''. Accuracy obscures self-preference; false approval reveals it. Llama's apparent accuracy advantage on its own work is driven by fewer false rejections, not error detection.}
 \label{tab:belief-reality}
 \begin{tabular}{lcccc}
@@ -116,7 +118,8 @@ We benchmark two ungrounded multi-agent jury architectures: \textbf{(1) Team A (
 
 \begin{table}[t]
 \centering
-\small
+\footnotesize
+\renewcommand{\arraystretch}{0.92}
 \caption{Deliberation juries (zero grounding) vs.\ execution-grounded verifier on DeepSeek code ($n = 150$). Juries inflate compute ($8\times\text{--}32\times$ tokens, $28\times\text{--}457\times$ cost) but trail grounding by $17\text{--}23$\,pp in error catch rate (TNR).}
 \label{tab:jury-comparison}
 \begin{tabular}{lccccc}
@@ -142,7 +145,8 @@ As shown in Table~\ref{tab:jury-comparison}, ungrounded deliberation trails exec
 
 \begin{table}[t]
 \centering
-\small
+\footnotesize
+\renewcommand{\arraystretch}{0.92}
 \caption{Synthesis of verifier interventions. Model-side fixes fail to resolve belief persistence; only execution grounding establishes reliability.}
 \label{tab:synthesis}
 \resizebox{\linewidth}{!}{%

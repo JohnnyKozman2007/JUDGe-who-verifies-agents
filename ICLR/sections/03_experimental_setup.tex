@@ -19,12 +19,13 @@ judge. Mathematics is therefore a checkable task presented to an unaided judge, 
 
 For science, candidate options are shuffled per item under a per-item seed ($42 + \text{item index}$) and rendered as A through D before reaching models, so option position carries no answer signal. Items failing validity checks (non-four count, empty option, or duplicate text) are discarded before the 150-item sample is filled.
 
-\begin{table}[t]
+\begin{table}[H]
 \caption{The three domains differ in whether a mechanical check exists and, separately, in
 whether the judge is shown one. Only code verifications receive an environment signal.}
 \label{tab:domains}
 \begin{center}
-\small
+\footnotesize
+\renewcommand{\arraystretch}{0.92}
 \begin{tabular}{llll}
 \toprule
 \bf Domain & \bf Benchmark & \bf Correctness established by & \bf Signal shown to judge \\
