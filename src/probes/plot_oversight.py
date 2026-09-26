@@ -19,6 +19,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from analysis_oversight import build_oversight_frame, full_confusion_by_verifier
 from analysis_detectability import load_or_build_grades

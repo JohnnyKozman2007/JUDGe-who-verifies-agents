@@ -34,6 +34,7 @@ import os, sys, json, argparse
 import numpy as np
 import pandas as pd
 
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from analysis_detectability import build_frame, load_or_build_grades
 
