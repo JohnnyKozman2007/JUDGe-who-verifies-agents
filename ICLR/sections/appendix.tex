@@ -142,7 +142,7 @@ The item-adjusted approval rate $\hat{r}_g$ for generator $g$ is formally define
 Positive values indicate that generator $g$'s errors are approved more frequently than the average model's errors on the identical problem set. Confidence intervals are derived via non-parametric bootstrapping resampling problem items ($1{,}000$ iterations).
 
 \subsection{Cross-Capability Oversight Breakdown}
-We analyze whether scaling model size improves verification quality by evaluating all 18 pairs of (stronger judge, weaker judge) on the identical set of candidate errors. Table~\ref{tab:oversight-full} details the oversight win-rate matrix.
+We analyze whether scaling model size improves verification quality by evaluating all 6 pairs of (stronger judge, weaker judge) across three domains (18 pairwise comparisons) on the identical set of candidate errors. Table~\ref{tab:oversight-full} details the oversight win-rate matrix.
 
 \begin{table}[H]
 \centering
@@ -162,7 +162,7 @@ Qwen2.5-72B (72B)  & Llama-3.3-70B      & 50.4\% & 51.1\% & 49.7\% \\
 \bottomrule
 \end{tabular}
 \end{table}
-While stronger models outperform the 12B baseline (Mistral) across ungrounded domains (53.1\%--61.8\% win rate), oversight between frontier 70B-class models collapses to near chance (49.7\%--53.7\%), demonstrating that scaling within the frontier tier provides negligible error-detection advantage.
+While stronger models outperform the 12B baseline (Mistral) across ungrounded domains (53.1\%--61.8\% win rate), oversight between frontier 70B-class models collapses to near chance (48.9\%--53.7\%), demonstrating that scaling within the frontier tier provides negligible error-detection advantage.
 
 \subsection{Ensemble Voting Sweep}
 Table~\ref{tab:ensemble-full} reports balanced accuracy across all majority-vote thresholds ($k$-of-$3$) using leave-one-out non-author panels.
