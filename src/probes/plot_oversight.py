@@ -173,7 +173,7 @@ Proportion of identical error candidates where a more capable verifier correctly
 
 ### Key Findings & Dynamics
 1. **Stronger vs. 12B Baseline:** Frontier models (DeepSeek-V3, Qwen-72B, Llama-70B) outperform the 12B baseline (Mistral) across ungrounded domains (53.1%–61.8% win rates).
-2. **Diminishing Returns Within Frontier Scale:** When comparing frontier models against each other (e.g., DeepSeek vs. Qwen, DeepSeek vs. Llama, Qwen vs. Llama), oversight win rates collapse to near-chance (49.7%–53.7%).
+2. **Diminishing Returns Within Frontier Scale:** When comparing frontier models against each other (e.g., DeepSeek vs. Qwen, DeepSeek vs. Llama, Qwen vs. Llama), oversight win rates collapse to near-chance (48.9%–53.7%).
 3. **Absence of Scaling in Code:** In code, the strongest judge (DeepSeek) loses head-to-head against smaller models (48.9% vs Llama, 49.5% vs Qwen) due to hyper-assertive test overruling.
 
 Generated from committed evaluation data via `src/probes/analysis_oversight.py` and `src/probes/plot_oversight.py`.
