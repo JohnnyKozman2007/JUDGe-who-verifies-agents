@@ -108,36 +108,71 @@ def load_science(mode):
             print(f"  - {skipped_item['issues']} | {skipped_item['question_preview']}...")
     return standardized
 
-def save_data(data, domain, mode):
+def save_data(data, domain, mode, overwrite=False):
     suffix = "_pilot.jsonl" if mode == "pilot" else ".jsonl"
     out_path = os.path.join(RAW_DATA_DIR, f"{domain}{suffix}")
     
-    # Check existing items for resume support
-    existing_ids = set()
+    if overwrite:
+        with open(out_path, "w", encoding="utf-8") as f:
+            for item in data:
+                f.write(json.dumps(item) + "\n")
+        print(f"Overwrote {out_path} with {len(data)} items.")
+        return
+
+    # Check existing items for resume support and withheld placeholders
+    existing_items = {}
+    has_withheld = False
     if os.path.exists(out_path):
         with open(out_path, "r", encoding="utf-8") as f:
             for line in f:
+                if not line.strip():
+                    continue
                 try:
-                    existing_ids.add(json.loads(line)["item_id"])
+                    loaded = json.loads(line)
+                    existing_items[loaded["item_id"]] = loaded
+                    if "[WITHHELD" in str(loaded.get("question", "")):
+                        has_withheld = True
                 except Exception:
                     pass
     
-    new_items = [item for item in data if item["item_id"] not in existing_ids]
+    # If the file contains withheld placeholders (e.g. from the public sanitized release),
+    # replace them with the newly loaded real questions.
+    if has_withheld:
+        print(f"Detected [WITHHELD] placeholders in {out_path}. Replacing with downloaded data...")
+        data_by_id = {item["item_id"]: item for item in data}
+        merged_items = []
+        for item_id, existing in existing_items.items():
+            if item_id in data_by_id:
+                merged_items.append(data_by_id[item_id])
+            else:
+                merged_items.append(existing)
+        for item in data:
+            if item["item_id"] not in existing_items:
+                merged_items.append(item)
+                
+        with open(out_path, "w", encoding="utf-8") as f:
+            for item in merged_items:
+                f.write(json.dumps(item) + "\n")
+        print(f"Successfully updated {len(merged_items)} items in {out_path}.")
+        return
+
+    new_items = [item for item in data if item["item_id"] not in existing_items]
     
     if not new_items:
-        print(f"Already have {len(existing_ids)} items for {domain} in {out_path}. Nothing to add.")
+        print(f"Already have {len(existing_items)} items for {domain} in {out_path}. Nothing to add.")
         return
     
     with open(out_path, "a", encoding="utf-8") as f:
         for item in new_items:
             f.write(json.dumps(item) + "\n")
-    print(f"Added {len(new_items)} new items to {out_path} (total: {len(existing_ids) + len(new_items)})")
+    print(f"Added {len(new_items)} new items to {out_path} (total: {len(existing_items) + len(new_items)})")
 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode", type=str, choices=["pilot", "actual"], default="pilot")
     parser.add_argument("--domain", type=str, choices=["all", "math", "code", "science"], default="all")
+    parser.add_argument("--overwrite", action="store_true", help="Overwrite existing raw data and save fresh")
     args = parser.parse_args()
 
     domains = ["math", "code", "science"] if args.domain == "all" else [args.domain]
@@ -149,6 +184,6 @@ if __name__ == "__main__":
             data = load_code(args.mode)
         elif domain == "science":
             data = load_science(args.mode)
-        save_data(data, domain, args.mode)
+        save_data(data, domain, args.mode, overwrite=args.overwrite)
     
     print("Data loading complete.")
