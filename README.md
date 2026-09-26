@@ -71,7 +71,8 @@ This repository contains materials for both the original exploratory workshop pa
 │       ├── run_self_preference_probe.py # Preference probe harness
 │       ├── run_style_transfer.py        # Style transfer probe harness
 │       ├── jury_probe_code.py           # Multi-agent debate jury evaluation
-│       └── analysis_ensemble.py         # Scaling & ensemble voting analysis
+│       ├── analysis_ensemble.py         # Scaling & ensemble voting analysis
+│       └── analysis_oversight.py        # Cross-capability oversight analysis & matrix
 │
 ├── data/                         # Experimental traces and artifacts
 │   ├── raw/                      # Ingested benchmark items (HumanEval+, MATH, GPQA)
@@ -83,7 +84,8 @@ This repository contains materials for both the original exploratory workshop pa
 │   ├── all/                      # Cross-domain aggregations and stratified statistics
 │   ├── code/                     # Code domain performance tables
 │   ├── math/                     # Math domain performance tables
-│   └── science/                  # Science domain performance tables
+│   ├── science/                  # Science domain performance tables
+│   └── probes/                   # Detailed probe reports & tables (oversight, jury, ensemble, etc.)
 │
 └── plots/                        # Generated figures and confusion matrices
 ```
