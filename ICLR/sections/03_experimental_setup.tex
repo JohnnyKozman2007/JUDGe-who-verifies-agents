@@ -85,7 +85,7 @@ Runs exceeding a five-second budget are reported to the judge as a timeout rathe
 failure. The prompt states that the block is a runtime signal rather than the final word,
 and explicitly permits the judge to mark passing code incorrect on logical grounds. That
 permission is deliberate: it makes judge-initiated deviation from the environment signal
-observable. Of the 21{,}600 code verifications, 1{,}458 (6.8\%) are such deviations, where
+observable. Of the 21{,}600 code verifications, 1{,}458 (6.75\%) are such deviations, where
 the judge rejected a candidate the harness had passed.
 
 Adjudicating an override requires a check independent of both the harness and the judge, so
@@ -95,10 +95,10 @@ behavior; the candidate and the benchmark's reference solution are both run on t
 15 input sets executed per override, maximum 83); and a second independent model
 (WizardLM-2-8x22B) adjudicates any divergence, deciding which of the two outputs is correct.
 We treat the oracle's verdict as a soft signal, since the oracle is itself unevaluated.
-Each override lands in one of three resolved verdicts: \textbf{\texttt{NO\_DISCREPANCY}} (1{,}125 overrides, 77.2\%), where no divergence was found within the budget and the judge rejected code behaving like the reference; \textbf{\texttt{BUG\_CONFIRMED}} (107, 7.3\%), where a divergence was found and the oracle confirmed a genuine candidate bug; or \textbf{\texttt{REFERENCE\_BUG}} (11, 0.8\%), where the oracle judged the benchmark's own reference solution to be flawed.
+Each override lands in one of three resolved verdicts: \textbf{\texttt{NO\_DISCREPANCY}} (1{,}125 overrides, 77.16\%), where no divergence was found within the budget and the judge rejected code behaving like the reference; \textbf{\texttt{BUG\_CONFIRMED}} (107, 7.34\%), where a divergence was found and the oracle confirmed a genuine candidate bug; or \textbf{\texttt{REFERENCE\_BUG}} (11, 0.75\%), where the oracle judged the benchmark's own reference solution to be flawed.
 
-The remaining 215 overrides (14.7\%) are unresolved: 168 (11.5\%) where the input-generation
-step failed and 47 (3.2\%) where the fuzzer itself errored. These keep the harness verdict.
+The remaining 215 overrides (14.75\%) are unresolved: 168 (11.52\%) where the input-generation
+step failed and 47 (3.22\%) where the fuzzer itself errored. These keep the harness verdict.
 
 Two consequences carry into the rest of the paper. First, the fuzzer sits inside the
 measurement loop rather than beside it. \texttt{BUG\_CONFIRMED} relabels a candidate as
