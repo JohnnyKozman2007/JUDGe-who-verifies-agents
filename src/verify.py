@@ -33,6 +33,12 @@ async def verify_candidate(item, domain, verifier_model, generator_model, candid
         candidate_answer = CodeCleaner.extract_code(candidate_answer)
         
     question = item["question"]
+    if domain == "science" and "[WITHHELD" in str(question):
+        raise RuntimeError(
+            f"Cannot verify {item.get('item_id', 'science item')}: "
+            "Question text is withheld under GPQA-Diamond anti-leakage terms. "
+            "Please run 'python src/data_loader.py' with your HF_TOKEN first to download the benchmark questions from HuggingFace."
+        )
     prompt = get_verification_prompt(domain, question, candidate_answer, frame, strategy)
 
     candidate_answer_parse = None
